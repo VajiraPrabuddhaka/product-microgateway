@@ -45,7 +45,10 @@ public class ExtAuthService extends AuthorizationGrpc.AuthorizationImplBase {
 
     @Override
     public void check(CheckRequest request, StreamObserver<CheckResponse> responseObserver) {
-        ResponseObject responseObject = requestHandler.process(request, responseObserver);
+        //ResponseObject responseObject = requestHandler.process(request, responseObserver);
+        ResponseObject responseObject = new ResponseObject();
+        responseObject.setStatusCode(APIConstants.StatusCodes.OK.getCode());
+
         CheckResponse response1 = buildResponse(request, responseObject);
         responseObserver.onNext(response1);
         // When you are done, you must call onCompleted.

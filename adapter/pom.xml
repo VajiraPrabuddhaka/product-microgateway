@@ -78,7 +78,7 @@
                   <images>
                     <image>
                         <alias>mg-adapter</alias>
-                        <name>wso2/mg-adapter:${project.version}</name>
+                        <name>vajiraprabuddhaka/mg-adapter:${project.version}-no_ext_auth</name>
                       <build>
                         <contextDir>${project.basedir}/src/main/resources</contextDir>
                         <assembly>

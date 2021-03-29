@@ -443,10 +443,8 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 	contextExtensions["sandClusterName"] = sandClusterName
 
 	perFilterConfig := extAuthService.ExtAuthzPerRoute{
-		Override: &extAuthService.ExtAuthzPerRoute_CheckSettings{
-			CheckSettings: &extAuthService.CheckSettings{
-				ContextExtensions: contextExtensions,
-			},
+		Override: &extAuthService.ExtAuthzPerRoute_Disabled{
+			Disabled: true,
 		},
 	}
 
