@@ -37,7 +37,7 @@
                   <images>
                     <image>
                         <alias>mg-router</alias>
-                        <name>wso2/mg-router:${project.version}</name>
+                        <name>vajiraprabuddhaka/mg-router:${project.version}</name>
                       <build>
                         <contextDir>${project.basedir}/src/main/resources</contextDir>
                         <assembly>
