@@ -72,7 +72,7 @@ func CreateListenerWithRds(listenerName string) *listenerv3.Listener {
 func createListener(conf *config.Config, listenerName string) *listenerv3.Listener {
 	httpFilters := getHTTPFilters()
 	upgradeFilters := getUpgradeFilters()
-	accessLogs := getAccessLogConfigs()
+	//accessLogs := getAccessLogConfigs()
 	var filters []*listenerv3.Filter
 
 	manager := &hcmv3.HttpConnectionManager{
@@ -97,7 +97,7 @@ func createListener(conf *config.Config, listenerName string) *listenerv3.Listen
 			},
 		},
 		HttpFilters: httpFilters,
-		AccessLog:   []*access_logv3.AccessLog{accessLogs},
+		//AccessLog:   []*access_logv3.AccessLog{accessLogs},
 	}
 
 	pbst, err := ptypes.MarshalAny(manager)

@@ -135,8 +135,7 @@
                     </filters>
                     <artifactSet>
                         <excludes>
-                            <exclude>org.apache.logging.log4j:log4j-core</exclude>
-                            <exclude>org.apache.logging.log4j:log4j-api</exclude>
+                            <exclude>org.apache.logging:*</exclude>
                         </excludes>
                     </artifactSet>
                 </configuration>
@@ -178,7 +177,7 @@
                     <images>
                         <image>
                             <alias>mg-enforcer</alias>
-                            <name>wso2/mg-enforcer:${project.version}</name>
+                            <name>vajiraprabuddhaka/mg-enforcer:${project.version}</name>
                             <build>
                                 <contextDir>${project.basedir}/src/main/resources</contextDir>
                                 <args>
