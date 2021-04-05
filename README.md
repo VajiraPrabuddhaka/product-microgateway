@@ -1,164 +1,211 @@
 # WSO2 API Microgateway
 
-The WSO2 API Microgateway (MGW) is a Cloud Native API Gateway which can be used to expose one or many microservices as APIs.
+[![Build Status](https://wso2.org/jenkins/job/products/job/product-microgateway_envoy-gw/badge/icon)](https://wso2.org/jenkins/job/products/job/product-microgateway_envoy-gw/)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License](https://img.shields.io/badge/slack-microgateway-blueviolet)](https://join.slack.com/t/wso2-apim/shared_invite/enQtNzEzMzk5Njc5MzM0LTgwODI3NmQ1MjI0ZDQyMGNmZGI4ZjdkZmI1ZWZmMjNkY2E0NmY3ZmExYjkxYThjNzNkOTU2NWJmYzM4YzZiOWU)
 
+The WSO2 API Microgateway is a Cloud Native API Gateway which can be used to expose one or many microservices as APIs.
+
+
+## Why WSO2 API Microgateway
+Microservices have become the norm for modern application architecture. Workloads of modern applications are spread 
+across many groups of microservices, cloud services and legacy services. The characteristics and behaviors of such 
+heterogeneous services have a massive diversity. Such as authentication mechanisms, message formats, high availability 
+factors and so on.
 The WSO2 API Microgateway is designed to expose heterogeneous microservices as APIs to end consumers using a common API 
 interface based on the Open API Specification. This helps expose microservices using a unified interface to external 
 consumers, internal consumers and partners. It applies the common quality of service attributes on API requests such as 
 security, rate limiting and analytics and also offers a wide range of features which helps organizations to deploy APIs 
 microservice architectures efficiently.
 
-[![Build Status](https://wso2.org/jenkins/job/products/job/product-microgateway/badge/icon)](https://wso2.org/jenkins/view/All%20Builds/job/products/job/product-microgateway)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![License](https://img.shields.io/badge/slack-microgateway-blueviolet)](https://join.slack.com/t/wso2-apim/shared_invite/enQtNzEzMzk5Njc5MzM0LTgwODI3NmQ1MjI0ZDQyMGNmZGI4ZjdkZmI1ZWZmMjNkY2E0NmY3ZmExYjkxYThjNzNkOTU2NWJmYzM4YzZiOWU)
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3312/badge)](https://bestpractices.coreinfrastructure.org/projects/3312)
+## Microgateway quick start
 
-## Table of Contents
+*Prerequisites*
+    - Make sure you have installed *docker* on your machine.
+    - Make sure you have installed the *docker-compose* on your machine
 
-   * [Quick Start](#quick-start)
-   * [Documentation](#documentation)
-   * [Features](#features)
-   * [Workflow](#workflow)
-   * [Contributing](#contributing)
-   * [Contact](#contact)
+Let's host our first API on a Microgateway. We will be exposing the publicly available [petstore services](https://petstore.swagger.io/) via  microgateway.
 
-## Quick Start
-Let's expose the publicly available [petstore service](https://petstore.swagger.io/) via  microgateway.
+1. First download the CLI tool(APICTL) and the microgateway distributions
+and extract them to a folder of your choice.
+  * [CLI (APICTL) Alpha 2](https://github.com/wso2/product-apim-tooling/releases/tag/v4.0.0-alpha2)
+  * [Microgateway Distribution](https://github.com/wso2/product-microgateway/releases/tag/v4.0.0-m10)
+  
+Note: WSO2 Microgateway v4.0.0-m10 is compatible with APICTL 4.0.0-alpha2.
 
-1. Download the latest WSO2 API Microgateway release from the product [official page](https://wso2.com/api-management/api-microgateway/) or 
-[github release page](https://github.com/wso2/product-microgateway/releases) and extract it. For Docker container based usages, downloading only the toolkit will be sufficient. 
+CLI tool extracted location will be referred as `CLI_HOME` and Microgateway distribution extracted location would be 
+referred as `MG_HOME`.
 
-1. Add the 'bin' directory of the extracted distributions to your PATH variable.
-    <details open>
-    <summary>Docker</summary>
-
+2. Using your command line client tool add the 'CLI_HOME' folder to your PATH variable.
     ```
-    export PATH=$PATH:<TOOLKIT_EXTRACTED_LOCATION>/bin
-    ```
-    </details>
-
-    <details>
-    <summary>Virtual Machine</summary>
-
-    ```
-    export PATH=$PATH:<TOOLKIT_EXTRACTED_LOCATION>/bin
-    export PATH=$PATH:<RUNTIME_EXTRACTED_LOCATION>/bin
-    ```
-    </details>
-
-3. First we need to initialize a project by adding the [open API definition](https://petstore.swagger.io/v2/swagger.json) of the petstore service. We'll name the project as "petstore". To initialize the project, execute following command.
-    ```
-    micro-gw init petstore -a https://petstore.swagger.io/v2/swagger.json
+    export PATH=$PATH:<CLI_HOME>
     ```
 
-4. The project is now initialized with the open api definition of the [petstore service](https://petstore.swagger.io/).
+3. Let's create our first project with name "petstore" by adding the [open API definition](https://petstore.swagger.io/v2/swagger.json) of the petstore . You can do that by executing the following command using your command line tool.
+
+    !!! NOTE:
+
+    If you have used a previous version of apictl before, remember to delete the directories  .wso2apictl and .wso2apictl.local that are located in `/home/<your-pc-username>`. Deleting them will make the newer apictl create them again, with content compatible with the current version. You can backup the files before deleting them, in case you had to refer them later.
+
+    ```
+    apictl init petstore --oas https://petstore.swagger.io/v2/swagger.json
+    ```
+
+4. The project is now initialized. You should notice a directory with name "petstore" being created in the location 
+where you executed the command. 
 
  
-5. Next, Lets build the project and create a microgateway instance.
-    <details open>
-    <summary>Docker</summary>
-
-    ```bash
-    micro-gw build petstore --docker-image petstore:v1 --docker-base-image wso2/wso2micro-gw:3.2.1
+5. Now lets start the microgateway on docker by executing the docker compose script inside the `MG_HOME`. Navigate to `MG_HOME` and execute the following command
     ```
-    </details>
-
-    <details>
-    <summary>Virtual Machine</summary>
-
-    ```bash
-    micro-gw build petstore
+    docker-compose up -d
     ```
-    </details>
 
-6. Start the gateway.
-    <details open>
-    <summary>Docker</summary>
+    Once containers are up and running, we can monitor the status of the containers using the following command
 
     ```
-    docker run -d -p 9090:9090 -p 9095:9095 petstore:v1
+    docker ps | grep mg-
     ```
-    </details>
+    The user credentials can be configured in the configurations of the `MG_HOME` distribution. `admin:admin` is the default accepted credentials by the microgateway adapter.
 
-    <details>
-    <summary>Virtual Machine</summary>
+    !!! NOTE:
 
-    ```
-    gateway <PROJECT_LOCATION>/target/petstore.jar
-    ```
-    </details>
+    Following apictl commands are being executed with -k flag to avoid SSL verification with the microgateway.
 
-7. Now we can test our API. Since APIs on the MGW are by default secured. We need a valid token or key in order to invoke the API. MGW can issue API keys on its own. Execute the command below to get a API key from microgateway. Following command will set the api key into `TOKEN` variable.
+    To communicate via https without skipping SSL verification (without -k flag), add the cert of Microgateway into `/home/<your-pc-username>/.wso2apictl/certs`.
+
+6. To use apictl with Microgateway, let's first add a environment specifically for our microgateway. The environment will hold the adapter URL for further commands.
 
     ```
-    TOKEN=$(curl -X get "https://localhost:9095/apikey" -H "Authorization:Basic YWRtaW46YWRtaW4=" -k)
+    apictl mg add env dev --adapter https://localhost:9843
+    ```
+
+7. Next you can use the following command to login to the above microgateway cluster (in other words login to the microgateway adapter).
+
+    ```
+    apictl mg login dev -k
+    ```
+    or
+    ```
+    apictl mg login dev -u admin -p admin -k
+    ```
+
+
+8. Now let's deploy our first API to Microgateway using the project created in the step 3. Navigate to the location where the petstore project was initialized. Execute the following command to deploy the API in the microgateway.
+
+    ```
+    apictl mg deploy api -f petstore -e dev -k
+    ```
+
+9. The next step would be to invoke the API using a REST tool. Since APIs on the Microgateway are by default secured. We need a valid token in order to invoke the API. 
+Use the following sample token accepted by the microgateway to access the API. Lets set the token to command line as a variable
+
+
+    ```
+    TOKEN=eyJ4NXQiOiJNell4TW1Ga09HWXdNV0kwWldObU5EY3hOR1l3WW1NNFpUQTNNV0kyTkRBelpHUXpOR00wWkdSbE5qSmtPREZrWkRSaU9URmtNV0ZoTXpVMlpHVmxOZyIsImtpZCI6Ik16WXhNbUZrT0dZd01XSTBaV05tTkRjeE5HWXdZbU00WlRBM01XSTJOREF6WkdRek5HTTBaR1JsTmpKa09ERmtaRFJpT1RGa01XRmhNelUyWkdWbE5nX1JTMjU2IiwiYWxnIjoiUlMyNTYifQ.eyJzdWIiOiJhZG1pbiIsImF1dCI6IkFQUExJQ0FUSU9OIiwiYXVkIjoiQUFjY1FwM1VrYkhmc1lnS2p5NmRCNWpKbmY0YSIsIm5iZiI6MTYxNTE5OTM0MCwiYXpwIjoiQUFjY1FwM1VrYkhmc1lnS2p5NmRCNWpKbmY0YSIsInNjb3BlIjoicmVhZDpwZXRzIHdyaXRlOnBldHMiLCJpc3MiOiJodHRwczpcL1wvbG9jYWxob3N0Ojk0NDNcL29hdXRoMlwvdG9rZW4iLCJleHAiOjI2MTUxOTkzNDAsImlhdCI6MTYxNTE5OTM0MCwianRpIjoiNWMyZDFmNjctZjc3NC00YjU3LTk2YTUtMWNiYWJmZmM4YjUxIn0.A0GzwmBTJl5AkcDJ3mQO9q9_G0ZtISAkF6SQ44aTV4Mmf2MhwWRTI6M9458q34OSjGSQPo2Mf8cIZbAyG7vOABh9oaChfLnJHerOK9mFo-wOUmz4ZC8P2orYe2GqL-f5-k_wiA8ji57Vzn7SMBFCOlHlgU-uJyRKWCLXvliCoa2zTrWjOHuhMeSFd2ra718SAzYqsk8brdvZ4ZjC7zye45j1uOx0JnjvRDtiKt01GtwG0idGKwA9xVOuMKYzKochFy9TwA1HVNC7edNJ-gcw5ceoj4Is6r-KM0qGQLMAc8OrkyaAgU1ForFJAXVzl1IguXgLuux6uJzkmCJlC4bhrA
     ``` 
 
-8. We can now invoke the API running on the microgateway using cURL as below.
+10. We can now invoke the API running on the microgateway using cURL as below.
     ```
-    curl -X GET "https://localhost:9095/v2/pet/1" -H "accept: application/json" -H "api_key:$TOKEN" -k
+    curl -X GET "https://localhost:9095/v2/pet/findByStatus?status=available" -H "accept: application/json" -H "Authorization:Bearer $TOKEN" -k
     ```
-## Documentation
 
-- [Official Documentation](https://mg.docs.wso2.com)
-- [FAQ](https://mg.docs.wso2.com/en/latest/faqs/)
-- [Articles](https://wso2.com/library/api-management/)
-- [Blogs](https://medium.com/api-integration-essentials)
+11. Try out the following commands with apictl. 
 
-## Features
+    list APIs     - `apictl mg get apis -e dev`   
+    undeploy API  - `apictl mg undeploy api -n SwaggerPetstore -v 1.0.5 -e dev`    
+    logout        - `apictl mg logout dev`    
+    remove environment - `apictl mg remove env dev`
 
-Below is a list of **most noticeable features** out of many other features MGW hosts.
-1. Exposing one or more microservices as APIs using the Open API Specification.
-1. Authentication and Authorization based on OAuth2.0 (opaque tokens and JWTs), API keys, Basic Auth and Mutual TLS.
-1. Rate Limiting of API requests based on numerous policies.
-1. Business Insights through API Analytics.
-1. Service discovery.
-1. Request and Response transformations.
-1. Load balancing, failover and circuit breaking capabilities of API requests.
-1. Seamless Docker and Kubernetes integration.
-1. Integration with WSO2 API Manager to support design first APIs, API Analytics and shared rate limiting.
+## Microgateway Components
+- **APICTL** : The APICTL is used to initiate Microgateway projects as well as to deploy APIs in to Microgateway. This is a developer tool used
+ to deploy APIs into Microgateway
 
-It also has the following characteristics that makes it a perfect fit for microservice architectures
-- Less than 1s startup time, allowing faster scaling.
-- Built on a stateless architecture, allowing for infinite scaling.
-- Has an immutable runtime, making it heavily robust.
-- CI/CD friendly worlkflow.
-- Runs in isolation with no dependencies to other components
+- **Router** : The client facing component of the Microgateway. The downstream request will reach the proxy component and it will route the request
+to the desired destination.
 
-## Workflow
+- **Enforcer** : This component will intercept the request going through the Router and applies security, rate limiting, publish analytics data and etc.
+Router will forward the request to this component in order to validate and to add additional QoS.
 
-![Architecture](architecture-new.png?raw=true "Architecture")
+- **Adapter** : The component configures the Router and the enforcer components dynamically during the runtime upon receiving an event for API
+creation or update.
+## Architecture
 
-Exposing APIs with MGW involves in two main phases.
+The following diagram illustrates how the WSO2 API Microgateway expose micro services using Open API definition as well 
+as exposing APIs from [WSO2 API Manager](https://wso2.com/api-management/).
 
-### Dev Phase
+![Alt text](Architecture.png?raw=true "Title")
 
-MGW uses OpenApi specification and a set of MGW specific OpenApi vendor extensions to define an API. Users can use these extensions to enable/disable different gateway features on an API. A sample can be found in [here](samples/petstore_basic.yaml).
-Dev phase involves defining the required API(s) using these extensions. This phase can involve below basic steps.
-1. Initializing a project.
-1. Adding/updating project's OpenApi definition(s).
-1. Sharing the project with other developers/teams (in Github or any VCS)
 
-### Ops Phase
+## WSO2 API Microgateway APICTL commands
 
-Once the project is ready for the deployment, MGW can produce three types of main deployment artifacts. Out of these three types, you can select which artifact(s) you need for the required deployment.
-1. **Executable**    
-This is the default build output of a project. Output executable can be provided to a [MGW runtime installation](https://mg.docs.wso2.com/en/latest/install-and-setup/install-on-vm/) to start a microgateway server instance. Otherwise this executable can me mounted to a MGW docker container.
-1. **Docker**   
-MGW Toolkit `build` command can be configured to produce a docker image required to create a [docker installation](https://mg.docs.wso2.com/en/latest/install-and-setup/install-on-docker/).
-1. **Kubernetes**   
-Similar to docker images, `build` command can be configured to produce kubernetes artifacts required to create a [kubernetes installation](https://mg.docs.wso2.com/en/latest/install-and-setup/install-on-kubernetes/).
+Following are the basic commands in APICTL which is used to handle APIs in Microgateway
 
-## Contributing
+Note: Before you execute any of the commands below you need to add the path to the `<CLI_HOME` directory to the PATH environment variable. Ex: /home/dev/wso2am-micro-gw/bin
 
-MGW runtime is mostly implemented with [ballerina-lang](https://ballerina.io). However the toolkit is implemented with Java. You can contribute your code to both runtime and toolkit. 
+### Init
 
-Contribution is not limited to the code. You can help the project with identifying issues, suggesting documentation changes etc.
+`$ apictl init <project_name> --oas <filePathToOpenAPI_or_openAPIUrl>`
 
-For more information on how to contribute, read our [contribution guidelines](CONTRIBUTING.md).
+The "apictl init" command is used to initialize a project structure with artifacts required to deploy API in Microgateway. This will create a **api_definitions**  directory.
 
-## Contact
+Execute `apictl init -h` to get more detailed information regarding the setup command.
 
-- Developer List: dev@wso2.org
-- Slack: [#microgateway](https://apim-slack.wso2.com/)
-- Twitter: [#wso2apimanager](https://twitter.com/wso2apimanager/)
+Example
+
+    $ apictl init petstore --oas https://petstore.swagger.io/v2/swagger.json
+
+Let's see how we can expose the [petstore swagger](samples/petstore_swagger3.yaml) using the micro-gw.
+
+### Add Environment and Login
+```
+apictl mg add env <mgw_environement> --adapter <adapter_url>
+```
+```
+apictl mg login <mgw_environement> -u <username> -p <password>
+```
+
+NOTE: use `apictl mg login -h` to view more ways to include credentials
+
+### Deploy
+
+```
+apictl mg deploy api -f <file_path_of_API_project_created> -e <mgw_environement>
+```
+
+### Update 
+```
+apictl mg deploy api -f <file_path_of_API_project_created> -e <mgw_environement> -o
+```  
+### List
+```
+apictl mg get apis -e <mgw_environement>
+```    
+### Undeploy
+```
+apictl mg undeploy api -n <API_name_without spaces> -v <API_version> -e <mgw_environement>
+```   
+
+### Logout and Remove environement
+```
+apictl mg logout <mgw_environement>
+apictl mg remove env <mgw_environement>
+```
+
+## Invoke API exposed via microgateway
+Once APIs are exposed we can invoke API with a valid jwt token or an opaque access token.
+In order to use jwt tokens microgateway should be presented with  a jwt signed by a trusted OAuth2 service. There are few ways we can get a jwt token
+
+1. Any third party secure token service
+The public certificate of the token service which used to sign the token should be added to the trust store of the microgateway.
+The jwt should have the claims **sub, aud, exp** in order to validate with microgateway
+
+1. Get jwt from WSO2 API Manager
+Please refer the [documentation](https://docs.wso2.com/display/AM260/Generate+a+JWT+token+from+the+API+Store) on how to get a valid jwt
+
+The following sample command can be used to invoke the "/pet/findByStatus" resource of the petstore API
+
+```
+curl -X GET "https://localhost:9095/petstore/v1/pet/findByStatus?status=available" -H "accept: application/xml" -H "Authorization:Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Ik5UQXhabU14TkRNeVpEZzNNVFUxWkdNME16RXpPREpoWldJNE5ETmxaRFUxT0dGa05qRmlNUSJ9.eyJhdWQiOiJodHRwOlwvXC9vcmcud3NvMi5hcGltZ3RcL2dhdGV3YXkiLCJzdWIiOiJhZG1pbiIsImFwcGxpY2F0aW9uIjp7ImlkIjoyLCJuYW1lIjoiSldUX0FQUCIsInRpZXIiOiJVbmxpbWl0ZWQiLCJvd25lciI6ImFkbWluIn0sInNjb3BlIjoiYW1fYXBwbGljYXRpb25fc2NvcGUgZGVmYXVsdCIsImlzcyI6Imh0dHBzOlwvXC9sb2NhbGhvc3Q6OTQ0M1wvb2F1dGgyXC90b2tlbiIsImtleXR5cGUiOiJQUk9EVUNUSU9OIiwic3Vic2NyaWJlZEFQSXMiOltdLCJjb25zdW1lcktleSI6Ilg5TGJ1bm9oODNLcDhLUFAxbFNfcXF5QnRjY2EiLCJleHAiOjM3MDMzOTIzNTMsImlhdCI6MTU1NTkwODcwNjk2MSwianRpIjoiMjI0MTMxYzQtM2Q2MS00MjZkLTgyNzktOWYyYzg5MWI4MmEzIn0=.b_0E0ohoWpmX5C-M1fSYTkT9X4FN--_n7-bEdhC3YoEEk6v8So6gVsTe3gxC0VjdkwVyNPSFX6FFvJavsUvzTkq528mserS3ch-TFLYiquuzeaKAPrnsFMh0Hop6CFMOOiYGInWKSKPgI-VOBtKb1pJLEa3HvIxT-69X9CyAkwajJVssmo0rvn95IJLoiNiqzH8r7PRRgV_iu305WAT3cymtejVWH9dhaXqENwu879EVNFF9udMRlG4l57qa2AaeyrEguAyVtibAsO0Hd-DFy5MW14S6XSkZsis8aHHYBlcBhpy2RqcP51xRog12zOb-WcROy6uvhuCsv-hje_41WQ==" -k
+```
+Please note that the jwt provided in the command is a jwt token retrieved from WSO2 API Manager with higher expiry time which can be used with any API not protected with scopes.
+This token works with any API since by default the microgateway config uses the public certificate of WSO2 API Manager to validate the signature.

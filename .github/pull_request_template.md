@@ -10,7 +10,9 @@ Fixes #
  - Integration tests added: Yes/No
 
 ### Tested environments
-<!-- Specify the environments you used to test this PR. OS, JDK version, etc... -->
+
+<!-- Specify the environments you used to test this PR. OS, DB, JDK version, etc... -->
+
 Not Tested
 
 ---
