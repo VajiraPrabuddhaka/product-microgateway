@@ -37,7 +37,7 @@
                   <images>
                     <image>
                         <alias>mg-router</alias>
-                        <name>vajiraprabuddhaka/mg-router:${project.version}</name>
+                        <name>vajiraprabuddhaka/mg-router:${project.version}-envoy-debug</name>
                       <build>
                         <contextDir>${project.basedir}/src/main/resources</contextDir>
                         <assembly>

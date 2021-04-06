@@ -14,7 +14,7 @@
 # limitations under the License.
 # -----------------------------------------------------------------------
 
-FROM envoyproxy/envoy:v1.14.1
+FROM envoyproxy/envoy-debug:v1.16.0
 
 COPY maven/envoy.yaml /etc/envoy/envoy.yaml
 COPY maven/security /home/wso2/security
