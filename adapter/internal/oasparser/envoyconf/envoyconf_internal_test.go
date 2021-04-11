@@ -32,9 +32,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/stretchr/testify/assert"
-	"github.com/wso2/micro-gw/config"
-	mgwconfig "github.com/wso2/micro-gw/config"
-	"github.com/wso2/micro-gw/internal/oasparser/model"
+	"github.com/wso2/adapter/config"
+	mgwconfig "github.com/wso2/adapter/config"
+	"github.com/wso2/adapter/internal/oasparser/model"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -300,6 +300,36 @@ func TestGenerateRegex(t *testing.T) {
 			userInputPath: "/v2/pet/findByIdstatus=availabe",
 			message:       "when query parameter is provided without ?",
 			isMatched:     false,
+		},
+		{
+			inputpath:     "/v2/pet/*",
+			userInputPath: "/v2/pet/findByIdstatus=availabe",
+			message:       "when the resource ends with *",
+			isMatched:     true,
+		},
+		{
+			inputpath:     "/v2/pet/{petId}.api",
+			userInputPath: "/v2/pet/findByIdstatus=availabe",
+			message:       "when the resource path param suffixed",
+			isMatched:     false,
+		},
+		{
+			inputpath:     "/v2/pet/{petId}.api",
+			userInputPath: "/v2/pet/pet1.api",
+			message:       "when the resource path param suffixed",
+			isMatched:     true,
+		},
+		{
+			inputpath:     "/v2/pet/pet{petId}",
+			userInputPath: "/v2/pet/findByIdstatus=availabe",
+			message:       "when the resource ends with *",
+			isMatched:     false,
+		},
+		{
+			inputpath:     "/v2/pet/pet{petId}",
+			userInputPath: "/v2/pet/pet1",
+			message:       "when the resource ends with *",
+			isMatched:     true,
 		},
 	}
 
