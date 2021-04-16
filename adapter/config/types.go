@@ -77,7 +77,13 @@ type Config struct {
 			// Private key to sign the token
 			TokenPrivateKeyPath string
 		}
-
+		// VhostMapping represents default vhost of gateway environments
+		VhostMapping []struct {
+			// Environment name of the gateway
+			Environment string
+			// Vhost to be default of the environment
+			Vhost string
+		}
 		//Consul represents the configuration required to connect to consul service discovery
 		Consul struct {
 			//Enable whether consul service discovery should be enabled
@@ -113,6 +119,7 @@ type Config struct {
 		SecuredListenerPort     uint32
 		ClusterTimeoutInSeconds time.Duration
 		KeyStore                keystore
+		SystemHost              string
 
 		// Global CORS configurations.
 		Cors struct {
@@ -139,7 +146,6 @@ type Config struct {
 	} `toml:"router"`
 
 	Enforcer struct {
-		EventHub        eventHub
 		ApimCredentials apimCredentials
 		AuthService     authService
 		JwtGenerator    jwtGenerator
@@ -336,23 +342,22 @@ type APICtlUser struct {
 
 // ControlPlane struct contains configurations related to the API Manager
 type controlPlane struct {
-	EventHub struct {
-		Enabled                 bool          `toml:"enabled"`
-		ServiceURL              string        `toml:"serviceUrl"`
-		Username                string        `toml:"username"`
-		Password                string        `toml:"password"`
-		SyncApisOnStartUp       bool          `toml:"syncApisOnStartUp"`
-		EnvironmentLabels       []string      `toml:"environmentLabels"`
-		RetryInterval           time.Duration `toml:"retryInterval"`
-		SkipSSLVerification     bool          `toml:"skipSSLVerification"`
-		JmsConnectionParameters struct {
-			EventListeningEndpoints []string `toml:"eventListeningEndpoints"`
-		} `toml:"jmsConnectionParameters"`
-	} `toml:"eventHub"`
+	Enabled                 bool          `toml:"enabled"`
+	ServiceURL              string        `toml:"serviceUrl"`
+	Username                string        `toml:"username"`
+	Password                string        `toml:"password"`
+	SyncApisOnStartUp       bool          `toml:"syncApisOnStartUp"`
+	EnvironmentLabels       []string      `toml:"environmentLabels"`
+	RetryInterval           time.Duration `toml:"retryInterval"`
+	SkipSSLVerification     bool          `toml:"skipSSLVerification"`
+	JmsConnectionParameters struct {
+		EventListeningEndpoints []string `toml:"eventListeningEndpoints"`
+	} `toml:"jmsConnectionParameters"`
 }
 
 // APIContent contains everything necessary to create an API
 type APIContent struct {
+	UUID               string
 	VHost              string
 	Name               string
 	Version            string

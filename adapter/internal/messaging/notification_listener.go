@@ -37,7 +37,7 @@ import (
 const (
 	apiEventType                = "API"
 	applicationEventType        = "APPLICATION"
-	subscriptionEventType       = "SUBSCRIPTIONS"
+	subscriptionEventType       = "SUBSCRIPTION"
 	scopeEvenType               = "SCOPE"
 	removeAPIFromGateway        = "REMOVE_API_FROM_GATEWAY"
 	deployAPIToGateway          = "DEPLOY_API_IN_GATEWAY"
@@ -118,7 +118,7 @@ func handleAPIEvents(data []byte, eventType string) {
 		}
 		if strings.EqualFold(deployAPIToGateway, apiEvent.Event.Type) {
 			conf, _ := config.ReadConfigs()
-			configuredEnvs := conf.ControlPlane.EventHub.EnvironmentLabels
+			configuredEnvs := conf.ControlPlane.EnvironmentLabels
 			if len(configuredEnvs) == 0 {
 				configuredEnvs = append(configuredEnvs, eh.DefaultGatewayLabelValue)
 			}
@@ -147,8 +147,8 @@ func handleAPIEvents(data []byte, eventType string) {
 				}
 			}
 		} else if strings.EqualFold(removeAPIFromGateway, apiEvent.Event.Type) {
-			// TODO: (renuka) fix here once the vhost feature is implemented.
-			xds.UndeployAPI("default", apiEvent.Name, apiEvent.Version, apiEvent.GatewayLabels)
+			xds.DeleteAPIWithAPIMEvent(apiEvent.UUID, apiEvent.Name, apiEvent.Version, apiEvent.GatewayLabels)
+			logger.LoggerMsg.Debugf("Undeployed API from router")
 			if _, ok := eh.APIListMap[env]; ok {
 				apiListOfEnv := eh.APIListMap[env].List
 				for i := range apiListOfEnv {

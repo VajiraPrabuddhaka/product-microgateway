@@ -21,7 +21,6 @@ package org.wso2.choreo.connect.enforcer.subscription;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.wso2.choreo.connect.discovery.subscription.APIs;
-import org.wso2.choreo.connect.enforcer.config.ConfigHolder;
 import org.wso2.choreo.connect.enforcer.constants.APIConstants;
 import org.wso2.choreo.connect.enforcer.discovery.ApiListDiscoveryClient;
 import org.wso2.choreo.connect.enforcer.discovery.ApplicationDiscoveryClient;
@@ -89,10 +88,7 @@ public class SubscriptionDataStoreImpl implements SubscriptionDataStore {
         this.appPolicyMap = new ConcurrentHashMap<>();
         this.apiPolicyMap = new ConcurrentHashMap<>();
         this.subscriptionMap = new ConcurrentHashMap<>();
-        //TODO: Enable data loading tasks if event hub is enabled
-        if (ConfigHolder.getInstance().getConfig().getEventHub().isEnabled()) {
-            initializeLoadingTasks();
-        }
+        initializeLoadingTasks();
     }
 
     @Override
@@ -114,18 +110,18 @@ public class SubscriptionDataStoreImpl implements SubscriptionDataStore {
     }
 
     @Override
-    public SubscriptionPolicy getSubscriptionPolicyByName(String policyName, int tenantId) {
+    public SubscriptionPolicy getSubscriptionPolicyByName(String policyName) {
 
         String key = PolicyType.SUBSCRIPTION +
-                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName, tenantId);
+                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName);
         return subscriptionPolicyMap.get(key);
     }
 
     @Override
-    public ApplicationPolicy getApplicationPolicyByName(String policyName, int tenantId) {
+    public ApplicationPolicy getApplicationPolicyByName(String policyName) {
 
         String key = PolicyType.APPLICATION + DELEM_PERIOD +
-                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName, tenantId);
+                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName);
         return appPolicyMap.get(key);
     }
 
@@ -136,10 +132,10 @@ public class SubscriptionDataStoreImpl implements SubscriptionDataStore {
     }
 
     @Override
-    public ApiPolicy getApiPolicyByName(String policyName, int tenantId) {
+    public ApiPolicy getApiPolicyByName(String policyName) {
 
         String key = PolicyType.API + DELEM_PERIOD +
-                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName, tenantId);
+                SubscriptionDataStoreUtil.getPolicyCacheKey(policyName);
         return apiPolicyMap.get(key);
     }
 
@@ -186,6 +182,7 @@ public class SubscriptionDataStoreImpl implements SubscriptionDataStore {
             newApplication.setSubName(application.getSubName());
             newApplication.setTokenType(application.getTokenType());
             newApplication.setUUID(application.getUuid());
+            newApplication.setTenantDomain(application.getTenantDomain());
             application.getAttributesMap().forEach(newApplication::addAttribute);
 
             newApplicationMap.put(newApplication.getCacheKey(), newApplication);
