@@ -1,0 +1,13 @@
+Scenario Name,Heap Size,Concurrent Users,Message Size (Bytes),Back-end Service Delay (ms),Error %,Throughput (Requests/sec),Average Response Time (ms),Standard Deviation of Response Time (ms),90th Percentile of Response Time (ms),95th Percentile of Response Time (ms),99th Percentile of Response Time (ms),WSO2 API Microgateway GC Throughput (%),Average WSO2 API Microgateway Memory Footprint After Full GC (M)
+Choreo-connect on k8s,512,10,50,0,0,2908.15,3.41,3.94,3.0,4.0,26.0,98.51,116.0
+Choreo-connect on k8s,512,10,1024,0,0,2865.83,3.46,3.95,3.0,4.0,26.0,98.4,123.857
+Choreo-connect on k8s,512,200,50,0,0,3261.22,61.26,33.15,93.0,96.0,103.0,98.29,122.429
+Choreo-connect on k8s,512,100,50,0,0,3393.49,29.42,27.88,74.0,76.0,80.0,98.33,121.0
+Choreo-connect on k8s,512,200,10240,0,0,2542.22,78.57,32.11,102.0,106.0,168.0,98.58,123.333
+Choreo-connect on k8s,512,50,1024,0,0,3288.9,15.16,19.79,61.0,63.0,67.0,98.31,122.375
+Choreo-connect on k8s,512,50,10240,0,0,2573.33,19.37,23.09,66.0,69.0,72.0,98.66,118.167
+Choreo-connect on k8s,512,100,10240,0,0,2588.02,38.57,31.08,80.0,83.0,87.0,98.63,121.833
+Choreo-connect on k8s,512,50,50,0,0,3325.05,15.0,19.5,60.0,63.0,66.0,98.38,120.286
+Choreo-connect on k8s,512,200,1024,0,0,3311.87,60.32,33.06,93.0,96.0,102.0,98.23,123.125
+Choreo-connect on k8s,512,10,10240,0,0,2361.36,4.2,5.38,4.0,5.0,32.0,98.69,120.0
+Choreo-connect on k8s,512,100,1024,0,0,3365.21,29.66,28.0,74.0,77.0,80.0,98.27,119.875
