@@ -15,7 +15,7 @@
 
 # default vhosts mapping for standalone mode
 [[adapter.vhostMapping]]
-  environment = "Production and Sandbox"
+  environment = "Default"
   vhost = "localhost"
 
 [adapter.keystore]
@@ -44,6 +44,7 @@
   securedListenerHost = "0.0.0.0"
   securedListenerPort = 9095
   clusterTimeoutInSeconds = 20
+  enforcerResponseTimeoutInSeconds = 20
   # system hostname for system API resources (eg: /testkey and /health)
   systemHost = "localhost"
 
@@ -230,7 +231,7 @@ allowCredentials = false
   serviceUrl = "https://apim:9443/"
   username="admin"
   password="$env{cp_admin_pwd}"
-  environmentLabels = ["Production and Sandbox"]
+  environmentLabels = ["Default"]
   retryInterval = 5
   skipSSLVerification=true
   # Message broker connection URL of the control plane
