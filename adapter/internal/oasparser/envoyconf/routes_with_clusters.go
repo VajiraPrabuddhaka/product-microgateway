@@ -18,6 +18,7 @@
 package envoyconf
 
 import (
+	"google.golang.org/protobuf/types/known/durationpb"
 	"net"
 	"regexp"
 
@@ -80,7 +81,7 @@ func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte,
 	if len(mgwSwagger.GetProdEndpoints()) > 0 {
 		apiLevelEndpointProd = mgwSwagger.GetProdEndpoints()
 		apilevelAddressP := createAddress(apiLevelEndpointProd[0].Host, apiLevelEndpointProd[0].Port)
-		apiLevelClusterNameProd = strings.TrimSpace(prodClustersConfigNamePrefix +
+		apiLevelClusterNameProd = strings.TrimSpace(prodClustersConfigNamePrefix + vHost + "_" +
 			strings.Replace(mgwSwagger.GetTitle(), " ", "", -1) + mgwSwagger.GetVersion())
 		apilevelClusterProd = createCluster(apilevelAddressP, apiLevelClusterNameProd, apiLevelEndpointProd[0].URLType,
 			upstreamCerts)
@@ -106,7 +107,7 @@ func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte,
 				"for the API %v:%v. Hence Sandbox endpoints are not applied", apiTitle, apiVersion)
 		} else {
 			apilevelAddressSand := createAddress(apiLevelEndpointSand[0].Host, apiLevelEndpointSand[0].Port)
-			apiLevelClusterNameSand = strings.TrimSpace(sandClustersConfigNamePrefix +
+			apiLevelClusterNameSand = strings.TrimSpace(sandClustersConfigNamePrefix + vHost + "_" +
 				strings.Replace(mgwSwagger.GetTitle(), " ", "", -1) + mgwSwagger.GetVersion())
 			apilevelClusterSand = createCluster(apilevelAddressSand, apiLevelClusterNameSand, apiLevelEndpointSand[0].URLType,
 				upstreamCerts)
@@ -365,7 +366,6 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 	prodClusterName := params.prodClusterName
 	sandClusterName := params.sandClusterName
 	endpointBasepath := params.endpointBasePath
-	authHeader := params.AuthHeader
 
 	logger.LoggerOasparser.Debug("creating a route....")
 	var (
@@ -373,7 +373,6 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 		action        *routev3.Route_Route
 		match         *routev3.RouteMatch
 		decorator     *routev3.Decorator
-		removeHeaders []string
 		resourcePath  string
 	)
 
@@ -428,25 +427,6 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 		}
 	}
 
-	conf, errReadConfig := config.ReadConfigs()
-	if errReadConfig != nil {
-		logger.LoggerOasparser.Fatal("Error loading configuration. ", errReadConfig)
-	}
-
-	if !conf.Security.Adapter.EnableOutboundAuthHeader {
-		var internalKey string = "Internal-Key"
-		logger.LoggerOasparser.Debugf("removeHeader: %v", authHeader)
-		if authHeader == "" {
-			authHeader = conf.Security.Adapter.AuthorizationHeader
-		}
-		removeHeaders = append(removeHeaders, authHeader)
-		removeHeaders = append(removeHeaders, internalKey)
-	}
-
-	if len(removeHeaders) == 0 {
-		removeHeaders = nil
-	}
-
 	var contextExtensions = make(map[string]string)
 	contextExtensions[pathContextExtension] = resourcePath
 	contextExtensions[vHostContextExtension] = vHost
@@ -497,7 +477,8 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 					},
 					Substitution: endpointBasepath,
 				},
-				UpgradeConfigs: getUpgradeConfig(apiType),
+				UpgradeConfigs:    getUpgradeConfig(apiType),
+				MaxStreamDuration: getMaxStreamDuration(apiType),
 			},
 		}
 	} else {
@@ -542,7 +523,6 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 		TypedPerFilterConfig: map[string]*any.Any{
 			wellknown.HTTPExternalAuthorization: filter,
 		},
-		RequestHeadersToRemove: removeHeaders,
 	}
 	return &router
 }
@@ -810,7 +790,7 @@ func genRouteCreateParams(swagger *model.MgwSwagger, resource *model.Resource, v
 		endpointBasePath:  endpointBasePath,
 		corsPolicy:        swagger.GetCorsConfig(),
 		resourcePathParam: "",
-		resourceMethods:   nil,
+		resourceMethods:   getDefaultResourceMethods(swagger.GetAPIType()),
 	}
 
 	if resource != nil {
@@ -832,4 +812,25 @@ func createAddress(remoteHost string, port uint32) *corev3.Address {
 		},
 	}}
 	return &address
+}
+
+// getMaxStreamDuration configures a maximum duration for a websocket route.
+func getMaxStreamDuration(apiType string) *routev3.RouteAction_MaxStreamDuration {
+	var maxStreamDuration *routev3.RouteAction_MaxStreamDuration = nil
+	if apiType == mgw.WS {
+		maxStreamDuration = &routev3.RouteAction_MaxStreamDuration{
+			MaxStreamDuration: &durationpb.Duration{
+				Seconds: 60 * 60 * 24,
+			},
+		}
+	}
+	return maxStreamDuration
+}
+
+func getDefaultResourceMethods(apiType string) []string {
+	var defaultResourceMethods []string = nil
+	if apiType == mgw.WS {
+		defaultResourceMethods = []string{"GET"}
+	}
+	return defaultResourceMethods
 }
