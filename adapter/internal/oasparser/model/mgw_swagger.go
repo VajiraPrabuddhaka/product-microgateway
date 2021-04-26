@@ -318,12 +318,29 @@ func (swagger *MgwSwagger) Validate() error {
 			return err
 		}
 	}
+
+	err := swagger.validateBasePath()
+	if err != nil {
+		logger.LoggerOasparser.Errorf("Error while parsing the API %s:%s - %v", swagger.title, swagger.version, err)
+		return err
+	}
+	return nil
+}
+
+func (swagger *MgwSwagger) validateBasePath() error {
+	if xWso2BasePath == "" {
+		return errors.New("Empty Basepath is provided. Either use x-wso2-basePath extension or assign basePath (if OpenAPI v2 definition is used)" +
+			" / servers entry (if OpenAPI v3 definition is used) with non empty context.")
+	}
 	return nil
 }
 
 func (endpoint *Endpoint) validateEndpoint() error {
 	if len(endpoint.ServiceDiscoveryString) > 0 {
 		return nil
+	}
+	if endpoint.Port == 0 || endpoint.Port > 65535 {
+		return errors.New("Endpoint port value should be between 0 and 65535")
 	}
 	if len(endpoint.Host) == 0 {
 		return errors.New("Empty Hostname is provided")

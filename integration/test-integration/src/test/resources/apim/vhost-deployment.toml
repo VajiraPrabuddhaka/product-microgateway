@@ -63,9 +63,26 @@ https_endpoint = "https://localhost:9095"
 websub_event_receiver_http_endpoint = "http://localhost:9021"
 websub_event_receiver_https_endpoint = "https://localhost:8021"
 
+######################## THIS IS THE ONLY CHANGE DONE TO DEFAULT DEPLOYMENT.TOML FILE ########################
+[[apim.gateway.environment.virtual_host]]
+ws_endpoint = "ws://us.wso2.com:9099"
+wss_endpoint = "wss://us.wso2.com:8099"
+http_endpoint = "http://us.wso2.com:9090"
+https_endpoint = "https://us.wso2.com:9095"
+websub_event_receiver_http_endpoint = "http://us.wso2.com:9021"
+websub_event_receiver_https_endpoint = "https://us.wso2.com:8021"
+
+[[apim.gateway.environment.virtual_host]]
+ws_endpoint = "ws://foods.com:9099"
+wss_endpoint = "wss://foods.com:8099"
+http_endpoint = "http://foods.com:9090"
+https_endpoint = "https://foods.com:9095"
+websub_event_receiver_http_endpoint = "http://foods.com:9021"
+websub_event_receiver_https_endpoint = "https://foods.com:8021"
+######################## END ########################
+
 [apim.sync_runtime_artifacts.gateway]
 gateway_labels =["Default"]
-enable = false
 #[apim.cache.gateway_token]
 #enable = true
 #expiry_time = "900s"
