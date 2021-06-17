@@ -23,10 +23,10 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/streadway/amqp"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	eventhubTypes "github.com/wso2/adapter/internal/eventhub/types"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	eventhubTypes "github.com/wso2/product-microgateway/adapter/pkg/eventhub/types"
+	msg "github.com/wso2/product-microgateway/adapter/pkg/messaging"
 )
 
 // constants related to key manager events
@@ -39,20 +39,21 @@ const (
 )
 
 // handleKMEvent
-func handleKMConfiguration(deliveries <-chan amqp.Delivery, done chan error) {
+func handleKMConfiguration() {
 	var (
 		indexOfKeymanager int
 		isFound           bool
 	)
-	for d := range deliveries {
-		var notification EventKeyManagerNotification
+	for d := range msg.KeyManagerChannel {
+		var notification msg.EventKeyManagerNotification
 		// var keyManagerConfig resourceTypes.KeymanagerConfig
 		var kmConfigMap map[string]interface{}
-
-		// var eventType string
-		json.Unmarshal([]byte(string(d.Body)), &notification)
-
-
+		unmarshalErr := json.Unmarshal([]byte(string(d.Body)), &notification)
+		if unmarshalErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling key manager event data %v", unmarshalErr.Error())
+			return
+		}
+		logger.LoggerInternalMsg.Infof("Event %s is received", notification.Event.PayloadData.EventType)
 		for i := range xds.KeyManagerList {
 			if strings.EqualFold(notification.Event.PayloadData.Name, xds.KeyManagerList[i].Name) {
 				isFound = true
@@ -62,16 +63,19 @@ func handleKMConfiguration(deliveries <-chan amqp.Delivery, done chan error) {
 		}
 
 		var decodedByte, err = base64.StdEncoding.DecodeString(notification.Event.PayloadData.Value)
+
 		if err != nil {
 			if _, ok := err.(base64.CorruptInputError); ok {
-				panic("\nbase64 input is corrupt, check the provided key")
+				logger.LoggerInternalMsg.Error("\nbase64 input is corrupt, check the provided key")
 			}
-			panic(err)
+
+			logger.LoggerInternalMsg.Errorf("Error occurred while decoding the notification event %v", err)
+			return
 		}
 
 		if strings.EqualFold(keyManagerConfigEvent, notification.Event.PayloadData.EventType) {
 			if isFound && strings.EqualFold(actionDelete, notification.Event.PayloadData.Action) {
-				logger.LoggerMsg.Infof("Found KM %s to be deleted index %d", notification.Event.PayloadData.Name,
+				logger.LoggerInternalMsg.Infof("Found KM %s to be deleted index %d", notification.Event.PayloadData.Name,
 					indexOfKeymanager)
 				if isFound {
 					xds.KeyManagerList[indexOfKeymanager] = xds.KeyManagerList[len(xds.KeyManagerList)-1]
@@ -79,15 +83,19 @@ func handleKMConfiguration(deliveries <-chan amqp.Delivery, done chan error) {
 				}
 				xds.GenerateAndUpdateKeyManagerList()
 			} else if decodedByte != nil {
-				logger.LoggerMsg.Infof("decoded stream %s", string(decodedByte))
-				json.Unmarshal([]byte(string(decodedByte)), &kmConfigMap)
+				logger.LoggerInternalMsg.Infof("decoded stream %s", string(decodedByte))
+				kmConfigMapErr := json.Unmarshal([]byte(string(decodedByte)), &kmConfigMap)
+				if kmConfigMapErr != nil {
+					logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling key manager config map %v", kmConfigMapErr)
+					return
+				}
 
 				if strings.EqualFold(actionAdd, notification.Event.PayloadData.Action) ||
 					strings.EqualFold(actionUpdate, notification.Event.PayloadData.Action) {
 					keyManager := eventhubTypes.KeyManager{Name: notification.Event.PayloadData.Name,
 						Type: notification.Event.PayloadData.Type, Enabled: notification.Event.PayloadData.Enabled,
 						TenantDomain: notification.Event.PayloadData.TenantDomain, Configuration: kmConfigMap}
-					logger.LoggerMsg.Infof("data %v", keyManager.Configuration)
+					logger.LoggerInternalMsg.Infof("data %v", keyManager.Configuration)
 
 					if isFound {
 						xds.KeyManagerList[indexOfKeymanager] = keyManager
@@ -100,6 +108,5 @@ func handleKMConfiguration(deliveries <-chan amqp.Delivery, done chan error) {
 		}
 		d.Ack(false)
 	}
-	logger.LoggerMsg.Info("handle: deliveries channel closed")
-	done <- nil
+	logger.LoggerInternalMsg.Info("handle: deliveries channel closed")
 }

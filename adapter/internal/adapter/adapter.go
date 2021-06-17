@@ -24,17 +24,19 @@ import (
 
 	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	xdsv3 "github.com/envoyproxy/go-control-plane/pkg/server/v3"
-	"github.com/wso2/adapter/internal/api/restserver"
-	"github.com/wso2/adapter/internal/auth"
-	apiservice "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/service/api"
-	configservice "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/service/config"
-	keymanagerservice "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/service/keymgt"
-	subscriptionservice "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/service/subscription"
-	throttleservice "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/service/throtlle"
-	wso2_server "github.com/wso2/adapter/internal/discovery/protocol/server/v3"
-	"github.com/wso2/adapter/internal/health"
-	healthservice "github.com/wso2/adapter/internal/health/api/wso2/health/service"
-	"github.com/wso2/adapter/internal/tlsutils"
+	restserver "github.com/wso2/product-microgateway/adapter/internal/api/restserver"
+	"github.com/wso2/product-microgateway/adapter/internal/auth"
+	enforcerCallbacks "github.com/wso2/product-microgateway/adapter/internal/discovery/xds/enforcercallbacks"
+	routercb "github.com/wso2/product-microgateway/adapter/internal/discovery/xds/routercallbacks"
+	apiservice "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/service/api"
+	configservice "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/service/config"
+	keymanagerservice "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/service/keymgt"
+	subscriptionservice "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/service/subscription"
+	throttleservice "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/service/throttle"
+	wso2_server "github.com/wso2/product-microgateway/adapter/pkg/discovery/protocol/server/v3"
+	"github.com/wso2/product-microgateway/adapter/pkg/health"
+	healthservice "github.com/wso2/product-microgateway/adapter/pkg/health/api/wso2/health/service"
+	"github.com/wso2/product-microgateway/adapter/pkg/tlsutils"
 
 	"context"
 	"flag"
@@ -45,13 +47,12 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	cb "github.com/wso2/adapter/internal/discovery/xds"
-	"github.com/wso2/adapter/internal/eventhub"
-	"github.com/wso2/adapter/internal/messaging"
-	"github.com/wso2/adapter/internal/synchronizer"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/config"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	"github.com/wso2/product-microgateway/adapter/internal/eventhub"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	"github.com/wso2/product-microgateway/adapter/internal/messaging"
+	"github.com/wso2/product-microgateway/adapter/internal/synchronizer"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 )
@@ -91,10 +92,10 @@ func runManagementServer(conf *config.Config, server xdsv3.Server, enforcerServe
 	enforcerThrottleDataDsSrv wso2_server.Server, port uint) {
 	var grpcOptions []grpc.ServerOption
 	grpcOptions = append(grpcOptions, grpc.MaxConcurrentStreams(grpcMaxConcurrentStreams))
+	publicKeyLocation, privateKeyLocation, truststoreLocation := restserver.GetKeyLocations()
+	cert, err := tlsutils.GetServerCertificate(publicKeyLocation, privateKeyLocation)
 
-	cert, err := tlsutils.GetServerCertificate()
-
-	caCertPool := tlsutils.GetTrustedCertPool()
+	caCertPool := tlsutils.GetTrustedCertPool(truststoreLocation)
 
 	if err == nil {
 		grpcOptions = append(grpcOptions, grpc.Creds(
@@ -178,17 +179,17 @@ func Run(conf *config.Config) {
 	enforcerRevokedTokenCache := xds.GetEnforcerRevokedTokenCache()
 	enforcerThrottleDataCache := xds.GetEnforcerThrottleDataCache()
 
-	srv := xdsv3.NewServer(ctx, cache, nil)
-	enforcerXdsSrv := wso2_server.NewServer(ctx, enforcerCache, &cb.Callbacks{})
-	enforcerSdsSrv := wso2_server.NewServer(ctx, enforcerSubscriptionCache, &cb.Callbacks{})
-	enforcerAppDsSrv := wso2_server.NewServer(ctx, enforcerApplicationCache, &cb.Callbacks{})
-	enforcerAPIDsSrv := wso2_server.NewServer(ctx, enforcerAPICache, &cb.Callbacks{})
-	enforcerAppPolicyDsSrv := wso2_server.NewServer(ctx, enforcerApplicationPolicyCache, &cb.Callbacks{})
-	enforcerSubPolicyDsSrv := wso2_server.NewServer(ctx, enforcerSubscriptionPolicyCache, &cb.Callbacks{})
-	enforcerAppKeyMappingDsSrv := wso2_server.NewServer(ctx, enforcerApplicationKeyMappingCache, &cb.Callbacks{})
-	enforcerKeyManagerDsSrv := wso2_server.NewServer(ctx, enforcerKeyManagerCache, &cb.Callbacks{})
-	enforcerRevokedTokenDsSrv := wso2_server.NewServer(ctx, enforcerRevokedTokenCache, &cb.Callbacks{})
-	enforcerThrottleDataDsSrv := wso2_server.NewServer(ctx, enforcerThrottleDataCache, &cb.Callbacks{})
+	srv := xdsv3.NewServer(ctx, cache, &routercb.Callbacks{})
+	enforcerXdsSrv := wso2_server.NewServer(ctx, enforcerCache, &enforcerCallbacks.Callbacks{})
+	enforcerSdsSrv := wso2_server.NewServer(ctx, enforcerSubscriptionCache, &enforcerCallbacks.Callbacks{})
+	enforcerAppDsSrv := wso2_server.NewServer(ctx, enforcerApplicationCache, &enforcerCallbacks.Callbacks{})
+	enforcerAPIDsSrv := wso2_server.NewServer(ctx, enforcerAPICache, &enforcerCallbacks.Callbacks{})
+	enforcerAppPolicyDsSrv := wso2_server.NewServer(ctx, enforcerApplicationPolicyCache, &enforcerCallbacks.Callbacks{})
+	enforcerSubPolicyDsSrv := wso2_server.NewServer(ctx, enforcerSubscriptionPolicyCache, &enforcerCallbacks.Callbacks{})
+	enforcerAppKeyMappingDsSrv := wso2_server.NewServer(ctx, enforcerApplicationKeyMappingCache, &enforcerCallbacks.Callbacks{})
+	enforcerKeyManagerDsSrv := wso2_server.NewServer(ctx, enforcerKeyManagerCache, &enforcerCallbacks.Callbacks{})
+	enforcerRevokedTokenDsSrv := wso2_server.NewServer(ctx, enforcerRevokedTokenCache, &enforcerCallbacks.Callbacks{})
+	enforcerThrottleDataDsSrv := wso2_server.NewServer(ctx, enforcerThrottleDataCache, &enforcerCallbacks.Callbacks{})
 
 	runManagementServer(conf, srv, enforcerXdsSrv, enforcerSdsSrv, enforcerAppDsSrv, enforcerAPIDsSrv,
 		enforcerAppPolicyDsSrv, enforcerSubPolicyDsSrv, enforcerAppKeyMappingDsSrv, enforcerKeyManagerDsSrv,
@@ -280,7 +281,7 @@ func fetchAPIsOnStartUp(conf *config.Config) {
 	// Wait for each environment to return it's result
 	for i := 0; i < len(envs); i++ {
 		data := <-c
-		logger.LoggerMgw.Debugf("Receiving data for an environment: %v", string(data.Resp))
+		logger.LoggerMgw.Debug("Receiving data for an environment")
 		if data.Resp != nil {
 			// For successfull fetches, data.Resp would return a byte slice with API project(s)
 			logger.LoggerMgw.Debug("Pushing data to router and enforcer")
@@ -290,7 +291,7 @@ func fetchAPIsOnStartUp(conf *config.Config) {
 			}
 			health.SetControlPlaneRestAPIStatus(err == nil)
 		} else if data.ErrorCode >= 400 && data.ErrorCode < 500 {
-			logger.LoggerMgw.Errorf("Error occurred when retrieveing APIs from control plane: %v", data.Err)
+			logger.LoggerMgw.Errorf("Error occurred when retrieving APIs from control plane: %v", data.Err)
 			isNoAPIArtifacts := data.ErrorCode == 404 && strings.Contains(data.Err.Error(), "No Api artifacts found")
 			health.SetControlPlaneRestAPIStatus(isNoAPIArtifacts)
 		} else {

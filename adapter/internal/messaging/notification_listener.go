@@ -24,13 +24,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/streadway/amqp"
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	eh "github.com/wso2/adapter/internal/eventhub"
-	"github.com/wso2/adapter/internal/eventhub/types"
-	"github.com/wso2/adapter/internal/synchronizer"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/config"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	eh "github.com/wso2/product-microgateway/adapter/internal/eventhub"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	"github.com/wso2/product-microgateway/adapter/internal/synchronizer"
+	"github.com/wso2/product-microgateway/adapter/pkg/eventhub/types"
+	msg "github.com/wso2/product-microgateway/adapter/pkg/messaging"
 )
 
 // constant variables
@@ -68,22 +68,27 @@ var (
 )
 
 // handleNotification to process
-func handleNotification(deliveries <-chan amqp.Delivery, done chan error) {
-	for d := range deliveries {
-		var notification EventNotification
+func handleNotification() {
+
+	for d := range msg.NotificationChannel {
+		var notification msg.EventNotification
 		var eventType string
-		json.Unmarshal([]byte(string(d.Body)), &notification)
+		notificationErr := json.Unmarshal([]byte(string(d.Body)), &notification)
+		if notificationErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling event data %v", notificationErr)
+			continue
+		}
+		logger.LoggerInternalMsg.Infof("Event %s is received", notification.Event.PayloadData.EventType)
 		var decodedByte, err = base64.StdEncoding.DecodeString(notification.Event.PayloadData.Event)
 		if err != nil {
 			if _, ok := err.(base64.CorruptInputError); ok {
-				panic("\nbase64 input is corrupt, check the provided key")
+				logger.LoggerInternalMsg.Error("\nbase64 input is corrupt, check the provided key")
 			}
-			panic(err)
+			logger.LoggerInternalMsg.Errorf("Error occurred while decoding the notification event %v", err)
+			continue
 		}
-		logger.LoggerMsg.Debugf("\n\n[%s]", decodedByte)
+		logger.LoggerInternalMsg.Debugf("\n\n[%s]", decodedByte)
 		eventType = notification.Event.PayloadData.EventType
-		logger.LoggerMsg.Debugf("Event type : %s", eventType)
-
 		if strings.Contains(eventType, apiLifeCycleChange) {
 			handleLifeCycleEvents(decodedByte)
 		} else if strings.Contains(eventType, apiEventType) {
@@ -97,18 +102,22 @@ func handleNotification(deliveries <-chan amqp.Delivery, done chan error) {
 		}
 		d.Ack(false)
 	}
-	logger.LoggerMsg.Infof("handle: deliveries channel closed")
-	done <- nil
+	logger.LoggerInternalMsg.Infof("handle: deliveries channel closed")
 }
 
 // handleAPIEvents to process api related data
 func handleAPIEvents(data []byte, eventType string) {
 	var (
-		apiEvent         APIEvent
+		apiEvent         msg.APIEvent
 		currentTimeStamp int64 = apiEvent.Event.TimeStamp
 	)
 
-	json.Unmarshal([]byte(string(data)), &apiEvent)
+	apiEventErr := json.Unmarshal([]byte(string(data)), &apiEvent)
+	if apiEventErr != nil {
+		logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling API event data %v", apiEventErr)
+		return
+	}
+
 	if !belongsToTenant(apiEvent.TenantDomain) {
 		apiName := apiEvent.APIName
 		if apiEvent.APIName == "" {
@@ -118,7 +127,7 @@ func handleAPIEvents(data []byte, eventType string) {
 		if apiEvent.Version == "" {
 			apiVersion = apiEvent.Version
 		}
-		logger.LoggerMsg.Debugf("API event for the API %s:%s is dropped due to having non related tenantDomain : %s",
+		logger.LoggerInternalMsg.Debugf("API event for the API %s:%s is dropped due to having non related tenantDomain : %s",
 			apiName, apiVersion, apiEvent.TenantDomain)
 		return
 	}
@@ -146,7 +155,7 @@ func handleAPIEvents(data []byte, eventType string) {
 							// If API is already found, it is a new revision deployement.
 							// Subscription relates details of an API does not change between new revisions
 							if apiEvent.Context == apiListOfEnv[i].Context && apiEvent.Version == apiListOfEnv[i].Version {
-								logger.LoggerMsg.Debugf("APIList for apiIId: %s is not updated as it already exists", apiEvent.UUID)
+								logger.LoggerInternalMsg.Debugf("APIList for apiIId: %s is not updated as it already exists", apiEvent.UUID)
 								return
 							}
 						}
@@ -160,8 +169,8 @@ func handleAPIEvents(data []byte, eventType string) {
 				}
 			}
 		} else if strings.EqualFold(removeAPIFromGateway, apiEvent.Event.Type) {
-			xds.DeleteAPIWithAPIMEvent(apiEvent.UUID, apiEvent.Name, apiEvent.Version, apiEvent.GatewayLabels)
-			logger.LoggerMsg.Debugf("Undeployed API from router")
+			xds.DeleteAPIWithAPIMEvent(apiEvent.UUID, apiEvent.Name, apiEvent.Version, apiEvent.GatewayLabels, apiEvent.TenantDomain)
+			logger.LoggerInternalMsg.Debugf("Undeployed API from router")
 			if _, ok := eh.APIListMap[env]; ok {
 				apiListOfEnv := eh.APIListMap[env].List
 				for i := range apiListOfEnv {
@@ -178,16 +187,20 @@ func handleAPIEvents(data []byte, eventType string) {
 }
 
 func handleLifeCycleEvents(data []byte) {
-	var apiEvent APIEvent
-	json.Unmarshal([]byte(string(data)), &apiEvent)
+	var apiEvent msg.APIEvent
+	apiLCEventErr := json.Unmarshal([]byte(string(data)), &apiEvent)
+	if apiLCEventErr != nil {
+		logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Lifecycle event data %v", apiLCEventErr)
+		return
+	}
 	if !belongsToTenant(apiEvent.TenantDomain) {
-		logger.LoggerMsg.Debugf("API Lifecycle event for the API %s:%s is dropped due to having non related tenantDomain : %s",
+		logger.LoggerInternalMsg.Debugf("API Lifecycle event for the API %s:%s is dropped due to having non related tenantDomain : %s",
 			apiEvent.APIName, apiEvent.APIVersion, apiEvent.TenantDomain)
 		return
 	}
 	conf, _ := config.ReadConfigs()
 	configuredEnvs := conf.ControlPlane.EnvironmentLabels
-	logger.LoggerMsg.Debugf("%s : %s API life cycle state change event triggered", apiEvent.APIName, apiEvent.APIVersion)
+	logger.LoggerInternalMsg.Debugf("%s : %s API life cycle state change event triggered", apiEvent.APIName, apiEvent.APIVersion)
 	if len(configuredEnvs) == 0 {
 		configuredEnvs = append(configuredEnvs, config.DefaultGatewayName)
 	}
@@ -198,7 +211,7 @@ func handleLifeCycleEvents(data []byte) {
 				if apiEvent.UUID == apiListOfEnv[i].UUID && (apiListOfEnv[i].APIStatus == blockedStatus ||
 					apiEvent.APIStatus == blockedStatus) {
 					//If previous or current state is 'Blocked' only we update the xds. All other states are neglected at the gateway
-					logger.LoggerMsg.Infof("Lifecycle state changed from %s to %s", apiListOfEnv[i].APIStatus, apiEvent.APIStatus)
+					logger.LoggerInternalMsg.Infof("Lifecycle state changed from %s to %s", apiListOfEnv[i].APIStatus, apiEvent.APIStatus)
 					apiListOfEnv[i].APIStatus = apiEvent.APIStatus
 					xds.UpdateEnforcerAPIList(configuredEnv, xds.MarshalAPIList(eh.APIListMap[configuredEnv]))
 					break
@@ -211,7 +224,7 @@ func handleLifeCycleEvents(data []byte) {
 // deleteAPIFromList when remove API From Gateway event happens
 func deleteAPIFromList(apiList []types.API, indexToBeDeleted int, apiUUID string, label string) []types.API {
 	apiList[indexToBeDeleted] = apiList[len(apiList)-1]
-	logger.LoggerMsg.Infof("API %s is deleted from APIList under Label %s", apiUUID, label)
+	logger.LoggerInternalMsg.Infof("API %s is deleted from APIList under Label %s", apiUUID, label)
 	return apiList[:len(apiList)-1]
 }
 
@@ -219,11 +232,15 @@ func deleteAPIFromList(apiList []types.API, indexToBeDeleted int, apiUUID string
 func handleApplicationEvents(data []byte, eventType string) {
 	if strings.EqualFold(applicationRegistration, eventType) ||
 		strings.EqualFold(removeApplicationKeyMapping, eventType) {
-		var applicationRegistrationEvent ApplicationRegistrationEvent
-		json.Unmarshal([]byte(string(data)), &applicationRegistrationEvent)
+		var applicationRegistrationEvent msg.ApplicationRegistrationEvent
+		appRegEventErr := json.Unmarshal([]byte(string(data)), &applicationRegistrationEvent)
+		if appRegEventErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Application Registration event data %v", appRegEventErr)
+			return
+		}
 
 		if !belongsToTenant(applicationRegistrationEvent.TenantDomain) {
-			logger.LoggerMsg.Debugf("Application Registration event for the Consumer Key : %s is dropped due to having non related tenantDomain : %s",
+			logger.LoggerInternalMsg.Debugf("Application Registration event for the Consumer Key : %s is dropped due to having non related tenantDomain : %s",
 				applicationRegistrationEvent.ConsumerKey, applicationRegistrationEvent.TenantDomain)
 			return
 		}
@@ -241,11 +258,15 @@ func handleApplicationEvents(data []byte, eventType string) {
 		eh.AppKeyMappingList.List = append(eh.AppKeyMappingList.List, applicationKeyMapping)
 		xds.UpdateEnforcerApplicationKeyMappings(xds.MarshalKeyMappingList(eh.AppKeyMappingList))
 	} else {
-		var applicationEvent ApplicationEvent
-		json.Unmarshal([]byte(string(data)), &applicationEvent)
+		var applicationEvent msg.ApplicationEvent
+		appEventErr := json.Unmarshal([]byte(string(data)), &applicationEvent)
+		if appEventErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Application event data %v", appEventErr)
+			return
+		}
 
 		if !belongsToTenant(applicationEvent.TenantDomain) {
-			logger.LoggerMsg.Debugf("Application event for the Application : %s (with uuid %s) is dropped due to having non related tenantDomain : %s",
+			logger.LoggerInternalMsg.Debugf("Application event for the Application : %s (with uuid %s) is dropped due to having non related tenantDomain : %s",
 				applicationEvent.ApplicationName, applicationEvent.UUID, applicationEvent.TenantDomain)
 			return
 		}
@@ -262,11 +283,11 @@ func handleApplicationEvents(data []byte, eventType string) {
 
 		if applicationEvent.Event.Type == applicationCreate {
 			eh.AppList.List = append(eh.AppList.List, application)
-			logger.LoggerMsg.Infof("Application %s is added.", applicationEvent.ApplicationName)
+			logger.LoggerInternalMsg.Infof("Application %s is added.", applicationEvent.ApplicationName)
 		} else if applicationEvent.Event.Type == applicationUpdate {
 			eh.AppList.List = removeApplication(eh.AppList.List, applicationEvent.ApplicationID)
 			eh.AppList.List = append(eh.AppList.List, application)
-			logger.LoggerMsg.Infof("Application %s is added.", applicationEvent.ApplicationName)
+			logger.LoggerInternalMsg.Infof("Application %s is added.", applicationEvent.ApplicationName)
 		} else if applicationEvent.Event.Type == applicationDelete {
 			eh.AppList.List = removeApplication(eh.AppList.List, applicationEvent.ApplicationID)
 		}
@@ -276,10 +297,14 @@ func handleApplicationEvents(data []byte, eventType string) {
 
 // handleSubscriptionRelatedEvents to process subscription related events
 func handleSubscriptionEvents(data []byte, eventType string) {
-	var subscriptionEvent SubscriptionEvent
-	json.Unmarshal([]byte(string(data)), &subscriptionEvent)
+	var subscriptionEvent msg.SubscriptionEvent
+	subEventErr := json.Unmarshal([]byte(string(data)), &subscriptionEvent)
+	if subEventErr != nil {
+		logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Subscription event data %v", subEventErr)
+		return
+	}
 	if !belongsToTenant(subscriptionEvent.TenantDomain) {
-		logger.LoggerMsg.Debugf("Subscription event for the Application : %s and API %s is dropped due to having non related tenantDomain : %s",
+		logger.LoggerInternalMsg.Debugf("Subscription event for the Application : %s and API %s is dropped due to having non related tenantDomain : %s",
 			subscriptionEvent.ApplicationUUID, subscriptionEvent.APIUUID, subscriptionEvent.TenantDomain)
 		return
 	}
@@ -306,16 +331,19 @@ func handleSubscriptionEvents(data []byte, eventType string) {
 
 // handlePolicyRelatedEvents to process policy related events
 func handlePolicyEvents(data []byte, eventType string) {
-	var policyEvent PolicyInfo
-	json.Unmarshal([]byte(string(data)), &policyEvent)
-
+	var policyEvent msg.PolicyInfo
+	policyEventErr := json.Unmarshal([]byte(string(data)), &policyEvent)
+	if policyEventErr != nil {
+		logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Throttling Policy event data %v", policyEventErr)
+		return
+	}
 	// TODO: Handle policy events
 	if strings.EqualFold(eventType, policyCreate) {
-		logger.LoggerMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
+		logger.LoggerInternalMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
 	} else if strings.EqualFold(eventType, policyUpdate) {
-		logger.LoggerMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
+		logger.LoggerInternalMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
 	} else if strings.EqualFold(eventType, policyDelete) {
-		logger.LoggerMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
+		logger.LoggerInternalMsg.Infof("Policy: %s for policy type: %s", policyEvent.PolicyName, policyEvent.PolicyType)
 	}
 
 	// TODO: (VirajSalaka) Decide if it is required to have API Level Policies
@@ -338,8 +366,12 @@ func handlePolicyEvents(data []byte, eventType string) {
 		xds.UpdateEnforcerApplicationPolicies(xds.MarshalApplicationPolicyList(eh.AppPolicyList))
 
 	} else if strings.EqualFold(subscriptionEventType, policyEvent.PolicyType) {
-		var subscriptionPolicyEvent SubscriptionPolicyEvent
-		json.Unmarshal([]byte(string(data)), &subscriptionPolicyEvent)
+		var subscriptionPolicyEvent msg.SubscriptionPolicyEvent
+		subPolicyErr := json.Unmarshal([]byte(string(data)), &subscriptionPolicyEvent)
+		if subPolicyErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling Subscription Policy event data %v", subPolicyErr)
+			return
+		}
 
 		subscriptionPolicy := types.SubscriptionPolicy{ID: subscriptionPolicyEvent.PolicyID, TenantID: -1,
 			Name: subscriptionPolicyEvent.PolicyName, QuotaType: subscriptionPolicyEvent.QuotaType,
@@ -372,11 +404,11 @@ func removeApplication(applications []types.Application, id int32) []types.Appli
 		}
 	}
 	if deleteIndex == -1 {
-		logger.LoggerMsg.Debugf("Application under id: %d is not available", id)
+		logger.LoggerInternalMsg.Debugf("Application under id: %d is not available", id)
 		return nil
 	}
 	applications[deleteIndex] = applications[len(applications)-1]
-	logger.LoggerMsg.Infof("Application %s is deleted.", appName)
+	logger.LoggerInternalMsg.Infof("Application %s is deleted.", appName)
 	return applications[:len(applications)-1]
 }
 
@@ -389,11 +421,11 @@ func removeSubscription(subscriptions []types.Subscription, id int32) []types.Su
 		}
 	}
 	if deleteIndex == -1 {
-		logger.LoggerMsg.Debugf("Subscription under id: %d is not available", id)
+		logger.LoggerInternalMsg.Debugf("Subscription under id: %d is not available", id)
 		return nil
 	}
 	subscriptions[deleteIndex] = subscriptions[len(subscriptions)-1]
-	logger.LoggerMsg.Debugf("Subscription under id: %d is deleted.", id)
+	logger.LoggerInternalMsg.Debugf("Subscription under id: %d is deleted.", id)
 	return subscriptions[:len(subscriptions)-1]
 }
 
@@ -422,7 +454,7 @@ func removeAppPolicy(appPolicies []types.ApplicationPolicy, id int32) []types.Ap
 		}
 	}
 	if deleteIndex == -1 {
-		logger.LoggerMsg.Debugf("Application Policy under id: %d is not available", id)
+		logger.LoggerInternalMsg.Debugf("Application Policy under id: %d is not available", id)
 		return nil
 	}
 	appPolicies[deleteIndex] = appPolicies[len(appPolicies)-1]
@@ -438,7 +470,7 @@ func removeSubPolicy(subPolicies []types.SubscriptionPolicy, id int32) []types.S
 		}
 	}
 	if deleteIndex == -1 {
-		logger.LoggerMsg.Debugf("Subscription Policy under id: %d is not available", id)
+		logger.LoggerInternalMsg.Debugf("Subscription Policy under id: %d is not available", id)
 		return nil
 	}
 	subPolicies[deleteIndex] = subPolicies[len(subPolicies)-1]
@@ -456,5 +488,7 @@ func isLaterEvent(timeStampMap map[string]int64, mapKey string, currentTimeStamp
 }
 
 func belongsToTenant(tenantDomain string) bool {
-	return config.GetControlPlaneConnectedTenantDomain() == tenantDomain
+	// TODO : enable this once the events are fixed in apim
+	// return config.GetControlPlaneConnectedTenantDomain() == tenantDomain
+	return true
 }

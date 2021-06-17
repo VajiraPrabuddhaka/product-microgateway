@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/discovery/api/wso2/discovery/config/enforcer"
-	"github.com/wso2/adapter/internal/discovery/api/wso2/discovery/keymgt"
-	"github.com/wso2/adapter/internal/discovery/api/wso2/discovery/subscription"
-	"github.com/wso2/adapter/internal/eventhub/types"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/config"
+	"github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/config/enforcer"
+	"github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/keymgt"
+	"github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/subscription"
+	"github.com/wso2/product-microgateway/adapter/pkg/eventhub/types"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
 )
 
 // MarshalConfig will marshal a Config struct - read from the config toml - to
@@ -96,10 +96,6 @@ func MarshalConfig(config *config.Config) *enforcer.Config {
 	}
 
 	return &enforcer.Config{
-		ApimCredentials: &enforcer.AmCredentials{
-			Username: config.Enforcer.ApimCredentials.Username,
-			Password: config.Enforcer.ApimCredentials.Password,
-		},
 		JwtGenerator: &enforcer.JWTGenerator{
 			Enable:                config.Enforcer.JwtGenerator.Enable,
 			Encoding:              config.Enforcer.JwtGenerator.Encoding,
@@ -128,8 +124,9 @@ func MarshalConfig(config *config.Config) *enforcer.Config {
 		Security: &enforcer.Security{
 			TokenService: issuers,
 			AuthHeader: &enforcer.AuthHeader{
-				EnableOutboundAuthHeader :    config.Enforcer.Security.AuthHeader.EnableOutboundAuthHeader,
-				AuthorizationHeader :    config.Enforcer.Security.AuthHeader.AuthorizationHeader,
+				EnableOutboundAuthHeader: config.Enforcer.Security.AuthHeader.EnableOutboundAuthHeader,
+				AuthorizationHeader:      config.Enforcer.Security.AuthHeader.AuthorizationHeader,
+				TestConsoleHeaderName:    config.Enforcer.Security.AuthHeader.TestConsoleHeaderName,
 			},
 		},
 		Cache:     cache,

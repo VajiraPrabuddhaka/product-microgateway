@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	routev3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
@@ -32,9 +33,9 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/stretchr/testify/assert"
-	"github.com/wso2/adapter/config"
-	mgwconfig "github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/oasparser/model"
+	"github.com/wso2/product-microgateway/adapter/config"
+	mgwconfig "github.com/wso2/product-microgateway/adapter/config"
+	"github.com/wso2/product-microgateway/adapter/internal/oasparser/model"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -112,12 +113,18 @@ func TestCreateRoute(t *testing.T) {
 		Enabled:     &wrappers.BoolValue{Value: false},
 	}}
 
+	TimeOutConfig := ptypes.DurationProto(60 * time.Second)
+
+	IdleTimeOutConfig := ptypes.DurationProto(300 * time.Second)
+
 	expectedRouteActionWithXWso2BasePath := &routev3.Route_Route{
 		Route: &routev3.RouteAction{
 			HostRewriteSpecifier: hostRewriteSpecifier,
 			RegexRewrite:         regexRewriteWithXWso2BasePath,
 			ClusterSpecifier:     clusterSpecifier,
 			UpgradeConfigs:       UpgradeConfigsDisabled,
+			Timeout:              TimeOutConfig,
+			IdleTimeout:          IdleTimeOutConfig,
 		},
 	}
 
@@ -356,6 +363,12 @@ func TestGenerateRegex(t *testing.T) {
 			inputpath:     "/v2/pet/pet{petId}",
 			userInputPath: "/v2/pet/pet1",
 			message:       "when the resource ends with *",
+			isMatched:     true,
+		},
+		{
+			inputpath:     "/v2/pet/pet",
+			userInputPath: "/v2/pet/pet?petId=12343",
+			message:       "when the resource has query params",
 			isMatched:     true,
 		},
 	}

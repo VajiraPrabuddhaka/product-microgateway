@@ -35,12 +35,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/auth"
-	"github.com/wso2/adapter/internal/tlsutils"
+	"github.com/wso2/product-microgateway/adapter/config"
+	"github.com/wso2/product-microgateway/adapter/internal/auth"
+	"github.com/wso2/product-microgateway/adapter/pkg/tlsutils"
 
-	apiServer "github.com/wso2/adapter/internal/api"
-	logger "github.com/wso2/adapter/loggers"
+	apiServer "github.com/wso2/product-microgateway/adapter/internal/api"
+	restserver "github.com/wso2/product-microgateway/adapter/internal/api/restserver"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
 )
 
 const (
@@ -88,7 +89,8 @@ func FetchAPIs(id *string, gwLabel []string, c chan SyncAPIResponse) {
 	logger.LoggerSync.Debugf("Skip SSL Verification: %v", skipSSL)
 	tr := &http.Transport{}
 	if !skipSSL {
-		caCertPool := tlsutils.GetTrustedCertPool()
+		_, _, truststoreLocation := restserver.GetKeyLocations()
+		caCertPool := tlsutils.GetTrustedCertPool(truststoreLocation)
 		tr = &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: caCertPool},
 		}
@@ -228,7 +230,7 @@ func PushAPIProjects(payload []byte, environments []string) error {
 			vhostToEnvsMap[environment.Vhost] = append(vhostToEnvsMap[environment.Vhost], environment.Name)
 		}
 
-		logger.LoggerSync.Debugf("Starting zip reading: %v", file.Name)
+		logger.LoggerSync.Infof("Start deploying api from file (API_ID:REVISION_ID).zip : %v", file.Name)
 		f, err := file.Open()
 		if err != nil {
 			logger.LoggerSync.Errorf("Error reading zip file: %v", err)
@@ -290,7 +292,7 @@ func FetchAPIsFromControlPlane(updatedAPIID string, updatedEnvs []string) {
 	go FetchAPIs(&updatedAPIID, finalEnvs, c)
 	for {
 		data := <-c
-		logger.LoggerSync.Debugf("Receing data for an envrionment: %v", string(data.Resp))
+		logger.LoggerSync.Debug("Receiving data for an environment")
 		if data.Resp != nil {
 			// For successfull fetches, data.Resp would return a byte slice with API project(s)
 			logger.LoggerSync.Info("Pushing data to router and enforcer")
@@ -300,7 +302,7 @@ func FetchAPIsFromControlPlane(updatedAPIID string, updatedEnvs []string) {
 			}
 			break
 		} else if data.ErrorCode >= 400 && data.ErrorCode < 500 {
-			logger.LoggerSync.Errorf("Error occurred when retrieveing APIs from control plane: %v", data.Err)
+			logger.LoggerSync.Errorf("Error occurred when retrieving APIs from control plane: %v", data.Err)
 		} else {
 			// Keep the iteration still until all the envrionment response properly.
 			logger.LoggerSync.Errorf("Error occurred while fetching data from control plane: %v", data.Err)

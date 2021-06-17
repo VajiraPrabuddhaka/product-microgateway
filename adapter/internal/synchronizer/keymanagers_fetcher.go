@@ -31,12 +31,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/auth"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	eventhubTypes "github.com/wso2/adapter/internal/eventhub/types"
-	"github.com/wso2/adapter/internal/tlsutils"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/config"
+	restserver "github.com/wso2/product-microgateway/adapter/internal/api/restserver"
+	"github.com/wso2/product-microgateway/adapter/internal/auth"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	eventhubTypes "github.com/wso2/product-microgateway/adapter/pkg/eventhub/types"
+	"github.com/wso2/product-microgateway/adapter/pkg/tlsutils"
 )
 
 const (
@@ -78,7 +79,8 @@ func FetchKeyManagersOnStartUp(conf *config.Config) {
 	logger.LoggerSync.Debugf("Skip SSL Verification: %v", skipSSL)
 	tr := &http.Transport{}
 	if !skipSSL {
-		caCertPool := tlsutils.GetTrustedCertPool()
+		_, _, truststoreLocation := restserver.GetKeyLocations()
+		caCertPool := tlsutils.GetTrustedCertPool(truststoreLocation)
 		tr = &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: caCertPool},
 		}
@@ -120,7 +122,11 @@ func FetchKeyManagersOnStartUp(conf *config.Config) {
 
 	if resp.StatusCode == http.StatusOK {
 		var keyManagers []eventhubTypes.KeyManager
-		json.Unmarshal(responseBytes, &keyManagers)
+		err := json.Unmarshal(responseBytes, &keyManagers)
+		if err != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshelling Key Managers event data %v", err)
+			return
+		}
 
 		for _, kmConfig := range keyManagers {
 			xds.KeyManagerList = append(xds.KeyManagerList, kmConfig)

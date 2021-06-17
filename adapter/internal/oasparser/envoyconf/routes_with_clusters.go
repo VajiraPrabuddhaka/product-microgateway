@@ -33,13 +33,13 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/wrappers"
-	mgw "github.com/wso2/adapter/internal/oasparser/model"
+	"github.com/wso2/product-microgateway/adapter/config"
+	mgw "github.com/wso2/product-microgateway/adapter/internal/oasparser/model"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/wso2/adapter/config"
-	"github.com/wso2/adapter/internal/oasparser/model"
-	"github.com/wso2/adapter/internal/svcdiscovery"
-	logger "github.com/wso2/adapter/loggers"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	"github.com/wso2/product-microgateway/adapter/internal/oasparser/model"
+	"github.com/wso2/product-microgateway/adapter/internal/svcdiscovery"
 
 	"strings"
 	"time"
@@ -57,7 +57,7 @@ import (
 //
 // First set of routes, clusters, addresses represents the production endpoints related
 // configurations. Next set represents the sandbox endpoints related configurations.
-func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte, vHost string) (routesP []*routev3.Route,
+func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte, vHost string, organizationID string) (routesP []*routev3.Route,
 	clustersP []*clusterv3.Cluster, addressesP []*corev3.Address) {
 	var (
 		routesProd []*routev3.Route
@@ -82,7 +82,7 @@ func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte,
 	if len(mgwSwagger.GetProdEndpoints()) > 0 {
 		apiLevelEndpointProd = mgwSwagger.GetProdEndpoints()
 		apilevelAddressP := createAddress(apiLevelEndpointProd[0].Host, apiLevelEndpointProd[0].Port)
-		apiLevelClusterNameProd = strings.TrimSpace(prodClustersConfigNamePrefix + vHost + "_" +
+		apiLevelClusterNameProd = strings.TrimSpace(organizationID + "_" + prodClustersConfigNamePrefix + vHost + "_" +
 			strings.Replace(mgwSwagger.GetTitle(), " ", "", -1) + mgwSwagger.GetVersion())
 		apilevelClusterProd = createCluster(apilevelAddressP, apiLevelClusterNameProd, apiLevelEndpointProd[0].URLType,
 			upstreamCerts)
@@ -108,7 +108,7 @@ func CreateRoutesWithClusters(mgwSwagger model.MgwSwagger, upstreamCerts []byte,
 				"for the API %v:%v. Hence Sandbox endpoints are not applied", apiTitle, apiVersion)
 		} else {
 			apilevelAddressSand := createAddress(apiLevelEndpointSand[0].Host, apiLevelEndpointSand[0].Port)
-			apiLevelClusterNameSand = strings.TrimSpace(sandClustersConfigNamePrefix + vHost + "_" +
+			apiLevelClusterNameSand = strings.TrimSpace(organizationID + "_" + sandClustersConfigNamePrefix + vHost + "_" +
 				strings.Replace(mgwSwagger.GetTitle(), " ", "", -1) + mgwSwagger.GetVersion())
 			apilevelClusterSand = createCluster(apilevelAddressSand, apiLevelClusterNameSand, apiLevelEndpointSand[0].URLType,
 				upstreamCerts)
@@ -367,6 +367,7 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 	prodClusterName := params.prodClusterName
 	sandClusterName := params.sandClusterName
 	endpointBasepath := params.endpointBasePath
+	config, _ := config.ReadConfigs()
 
 	logger.LoggerOasparser.Debug("creating a route....")
 	var (
@@ -480,6 +481,8 @@ func createRoute(params *routeCreateParams) *routev3.Route {
 				},
 				UpgradeConfigs:    getUpgradeConfig(apiType),
 				MaxStreamDuration: getMaxStreamDuration(apiType),
+				Timeout:           ptypes.DurationProto(config.Envoy.Upstream.Timeouts.RouteTimeoutInSeconds * time.Second),
+				IdleTimeout:       ptypes.DurationProto(config.Envoy.Upstream.Timeouts.RouteIdleTimeoutInSeconds * time.Second),
 			},
 		}
 	} else {
@@ -668,6 +671,9 @@ func generateRoutePaths(xWso2Basepath, basePath, resourcePath string) string {
 		prefix = basepathConsistent(basePath)
 		// TODO: (VirajSalaka) Decide if it is possible to proceed without both basepath options
 	}
+	if strings.Contains(resourcePath, "?") {
+		resourcePath = strings.Split(resourcePath, "?")[0]
+	}
 	fullpath := prefix + resourcePath
 	newPath = generateRegex(fullpath)
 	return newPath
@@ -694,21 +700,9 @@ func generateRegex(fullpath string) string {
 	endRegex := "(\\?([^/]+))?"
 	newPath := ""
 
-	if strings.Contains(fullpath, "{") && strings.Contains(fullpath, "}") {
-		res1 := strings.Split(fullpath, "/")
-
-		for i, p := range res1 {
-			if strings.Contains(p, "{") && strings.Contains(p, "}") {
-				startP := strings.Index(p, "{")
-				endP := strings.Index(p, "}")
-				res1[i] = p[:startP] + pathParaRegex + p[endP+1:]
-			}
-		}
-		newPath = strings.Join(res1[:], "/")
-
-	} else {
-		newPath = fullpath
-	}
+	// Check and replace all the path parameters
+	matcher := regexp.MustCompile(`{([^}]+)}`)
+	newPath = matcher.ReplaceAllString(fullpath, pathParaRegex)
 
 	if strings.HasSuffix(newPath, "/*") {
 		newPath = strings.TrimSuffix(newPath, "/*") + wildCardRegex

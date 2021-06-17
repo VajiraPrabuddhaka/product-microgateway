@@ -32,13 +32,14 @@ import (
 	"time"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/wso2/adapter/config"
-	km "github.com/wso2/adapter/internal/discovery/api/wso2/discovery/keymgt"
+	"github.com/wso2/product-microgateway/adapter/config"
+	km "github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/keymgt"
 
-	"github.com/wso2/adapter/internal/auth"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	"github.com/wso2/adapter/internal/tlsutils"
-	logger "github.com/wso2/adapter/loggers"
+	restserver "github.com/wso2/product-microgateway/adapter/internal/api/restserver"
+	"github.com/wso2/product-microgateway/adapter/internal/auth"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	"github.com/wso2/product-microgateway/adapter/pkg/tlsutils"
 )
 
 const (
@@ -75,7 +76,8 @@ func RetrieveTokens(c chan SyncAPIResponse) {
 	logger.LoggerSync.Debugf("Skip SSL Verification: %v", skipSSL)
 	tr := &http.Transport{}
 	if !skipSSL {
-		caCertPool := tlsutils.GetTrustedCertPool()
+		_, _, truststoreLocation := restserver.GetKeyLocations()
+		caCertPool := tlsutils.GetTrustedCertPool(truststoreLocation)
 		tr = &http.Transport{
 			TLSClientConfig: &tls.Config{RootCAs: caCertPool},
 		}

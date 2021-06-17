@@ -22,18 +22,22 @@ import (
 	"encoding/json"
 
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
-	"github.com/streadway/amqp"
-	"github.com/wso2/adapter/internal/discovery/api/wso2/discovery/keymgt"
-	"github.com/wso2/adapter/internal/discovery/xds"
-	logger "github.com/wso2/adapter/loggers"
+	"github.com/wso2/product-microgateway/adapter/internal/discovery/xds"
+	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
+	"github.com/wso2/product-microgateway/adapter/pkg/discovery/api/wso2/discovery/keymgt"
+	msg "github.com/wso2/product-microgateway/adapter/pkg/messaging"
 )
 
-func handleTokenRevocation(deliveries <-chan amqp.Delivery, done chan error) {
-
-	for d := range deliveries {
-		var notification EventTokenRevocationNotification
-		json.Unmarshal([]byte(string(d.Body)), &notification)
-		logger.LoggerMsg.Printf("RevokedToken: %s, Token Type: %s", notification.Event.PayloadData.RevokedToken,
+func handleTokenRevocation() {
+	for d := range msg.RevokedTokenChannel {
+		var notification msg.EventTokenRevocationNotification
+		unmarshalErr := json.Unmarshal([]byte(string(d.Body)), &notification)
+		if unmarshalErr != nil {
+			logger.LoggerInternalMsg.Errorf("Error occurred while unmarshalling revoked token event data %v", unmarshalErr)
+			continue
+		}
+		logger.LoggerInternalMsg.Infof("Event %s is received", notification.Event.PayloadData.Type)
+		logger.LoggerInternalMsg.Printf("RevokedToken: %s, Token Type: %s", notification.Event.PayloadData.RevokedToken,
 			notification.Event.PayloadData.Type)
 		var stokens []types.Resource
 		t := &keymgt.RevokedToken{}
@@ -43,6 +47,5 @@ func handleTokenRevocation(deliveries <-chan amqp.Delivery, done chan error) {
 		xds.UpdateEnforcerRevokedTokens(stokens)
 		d.Ack(false)
 	}
-	logger.LoggerMsg.Infof("handle: deliveries channel closed")
-	done <- nil
+	logger.LoggerInternalMsg.Infof("handle: deliveries channel closed")
 }

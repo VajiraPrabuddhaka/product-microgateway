@@ -24,8 +24,8 @@ import org.apache.logging.log4j.Logger;
 import org.wso2.carbon.apimgt.common.gateway.dto.ClaimMappingDto;
 import org.wso2.carbon.apimgt.common.gateway.dto.JWKSConfigurationDTO;
 import org.wso2.carbon.apimgt.common.gateway.dto.JWTConfigurationDto;
-import org.wso2.choreo.connect.discovery.config.enforcer.AmCredentials;
 import org.wso2.choreo.connect.discovery.config.enforcer.Analytics;
+import org.wso2.choreo.connect.discovery.config.enforcer.AuthHeader;
 import org.wso2.choreo.connect.discovery.config.enforcer.BinaryPublisher;
 import org.wso2.choreo.connect.discovery.config.enforcer.Cache;
 import org.wso2.choreo.connect.discovery.config.enforcer.ClaimMapping;
@@ -56,7 +56,6 @@ import org.wso2.choreo.connect.enforcer.exception.EnforcerException;
 import org.wso2.choreo.connect.enforcer.security.jwt.JWTUtil;
 import org.wso2.choreo.connect.enforcer.throttle.databridge.agent.conf.AgentConfiguration;
 import org.wso2.choreo.connect.enforcer.util.TLSUtils;
-import org.wso2.gateway.discovery.config.enforcer.AuthHeader;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -128,9 +127,6 @@ public class ConfigHolder {
         // Read jwt token configuration
         populateJWTIssuerConfiguration(config.getSecurity().getTokenServiceList());
 
-        // Read credentials used to connect with APIM services
-        populateAPIMCredentials(config.getApimCredentials());
-
         // Read throttle publisher configurations
         populateThrottlingConfig(config.getThrottling());
 
@@ -156,6 +152,7 @@ public class ConfigHolder {
         AuthHeaderDto authHeaderDto = new AuthHeaderDto();
         authHeaderDto.setAuthorizationHeader(authHeader.getAuthorizationHeader());
         authHeaderDto.setEnableOutboundAuthHeader(authHeader.getEnableOutboundAuthHeader());
+        authHeaderDto.setTestConsoleHeaderName(authHeader.getTestConsoleHeaderName());
         config.setAuthHeader(authHeaderDto);
     }
 
@@ -295,13 +292,6 @@ public class ConfigHolder {
         } catch (KeyStoreException | CertificateException | NoSuchAlgorithmException | IOException e) {
             logger.error("Error in loading certs to the trust store.", e);
         }
-    }
-
-    private void populateAPIMCredentials(AmCredentials cred) {
-        String username = cred.getUsername();
-        char[] password = cred.getPassword().toCharArray();
-        CredentialDto credentialDto = new CredentialDto(username, password);
-        config.setApimCredentials(credentialDto);
     }
 
     /**
