@@ -98,6 +98,7 @@ var (
 
 	// KeyManagerList to store data
 	KeyManagerList = make([]eventhubTypes.KeyManager, 0)
+	isReady        = false
 )
 
 var void struct{}
@@ -218,17 +219,32 @@ func GetEnforcerThrottleDataCache() wso2_cache.SnapshotCache {
 	return enforcerThrottleDataCache
 }
 
+// DeployReadinessAPI Method to set the status after the last api is fected and updated in router.
+func DeployReadinessAPI(envs []string) {
+	logger.LoggerXds.Infof("Finished fetching APIs from the Control Plane. Deploying the readiness endpoint...")
+	isReady = true
+	for _, env := range envs {
+		listeners, clusters, routes, endpoints, apis := GenerateEnvoyResoucesForLabel(env)
+		UpdateXdsCacheWithLock(env, endpoints, clusters, routes, listeners)
+		UpdateEnforcerApis(env, apis, "")
+	}
+}
+
 // UpdateAPI updates the Xds Cache when OpenAPI Json content is provided
-func UpdateAPI(apiContent config.APIContent) {
+func UpdateAPI(apiContent config.APIContent) error {
 	var newLabels []string
 	var mgwSwagger mgw.MgwSwagger
 	var organizationID = apiContent.OrganizationID
+	var err error
 	if len(apiContent.Environments) == 0 {
 		apiContent.Environments = []string{config.DefaultGatewayName}
 	}
 
 	if apiContent.APIType == mgw.HTTP {
-		mgwSwagger = operator.GetMgwSwagger(apiContent.APIDefinition)
+		mgwSwagger, err = operator.GetMgwSwagger(apiContent.APIDefinition)
+		if err != nil {
+			return err
+		}
 		mgwSwagger.SetID(apiContent.UUID)
 		mgwSwagger.SetName(apiContent.Name)
 		mgwSwagger.SetVersion(apiContent.Version)
@@ -245,14 +261,20 @@ func UpdateAPI(apiContent config.APIContent) {
 
 	if (len(mgwSwagger.GetProdEndpoints()) == 0 || mgwSwagger.GetProdEndpoints()[0].Host == "/") &&
 		(len(mgwSwagger.GetSandEndpoints()) == 0 || mgwSwagger.GetSandEndpoints()[0].Host == "/") {
-		mgwSwagger.SetXWso2ProductionEndpointMgwSwagger(apiContent.ProductionEndpoint)
-		mgwSwagger.SetXWso2SandboxEndpointForMgwSwagger(apiContent.SandboxEndpoint)
+		productionEndpointErr := mgwSwagger.SetXWso2ProductionEndpointMgwSwagger(apiContent.ProductionEndpoint)
+		if productionEndpointErr != nil {
+			return productionEndpointErr
+		}
+		sandboxEndpointErr := mgwSwagger.SetXWso2SandboxEndpointForMgwSwagger(apiContent.SandboxEndpoint)
+		if sandboxEndpointErr != nil {
+			return sandboxEndpointErr
+		}
 	}
 
 	validationErr := mgwSwagger.Validate()
 	if validationErr != nil {
 		logger.LoggerOasparser.Errorf("Validation failed for the API %s:%s of Organization %s", mgwSwagger.GetTitle(), mgwSwagger.GetVersion(), organizationID)
-		return
+		return validationErr
 	}
 
 	apiIdentifier := GenerateIdentifierForAPI(apiContent.VHost, apiContent.Name, apiContent.Version)
@@ -341,6 +363,7 @@ func UpdateAPI(apiContent config.APIContent) {
 	if svcdiscovery.IsServiceDiscoveryEnabled {
 		startConsulServiceDiscovery(apiContent.OrganizationID) //consul service discovery starting point
 	}
+	return nil
 }
 
 // GetAllEnvironments returns all the environments merging new environments with already deployed environments
@@ -446,7 +469,7 @@ func DeleteAPIWithAPIMEvent(uuid, name, version string, environments []string, o
 		} else {
 			// if no error, update internal vhost maps
 			// error only happens when API not found in deleteAPI func
-			logger.LoggerXds.Debugf("Successfully undeployed API %v of Organization %v from environments %v", apiIdentifier, organizationID, environments)
+			logger.LoggerXds.Infof("Successfully undeployed API %v of Organization %v from environments %v", apiIdentifier, organizationID, environments)
 			for _, environment := range environments {
 				// delete environment if exists
 				delete(apiUUIDToGatewayToVhosts[uuid], environment)
@@ -585,6 +608,12 @@ func GenerateEnvoyResoucesForLabel(label string) ([]types.Resource, []types.Reso
 	// Add health endpoint
 	routeHealth := envoyconf.CreateHealthEndpoint()
 	vhostToRouteArrayMap[systemHost] = append(vhostToRouteArrayMap[systemHost], routeHealth)
+
+	// Add the readiness endpoint. isReady flag will be set to true once all the apis are fetched from the control plane
+	if isReady {
+		readynessEndpoint := envoyconf.CreateReadyEndpoint()
+		vhostToRouteArrayMap[systemHost] = append(vhostToRouteArrayMap[systemHost], readynessEndpoint)
+	}
 
 	listenerArray, listenerFound := envoyListenerConfigMap[label]
 	routesConfig, routesConfigFound := envoyRouteConfigMap[label]
