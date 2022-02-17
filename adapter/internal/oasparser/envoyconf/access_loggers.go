@@ -25,9 +25,11 @@ import (
 	file_accesslogv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/file/v3"
 	grpc_accesslogv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/grpc/v3"
 	"github.com/golang/protobuf/ptypes"
+	_struct "github.com/golang/protobuf/ptypes/struct"
 	"github.com/wso2/product-microgateway/adapter/config"
 	logger "github.com/wso2/product-microgateway/adapter/internal/loggers"
 	"github.com/wso2/product-microgateway/adapter/pkg/logging"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -45,10 +47,17 @@ func getFileAccessLogConfigs() *config_access_logv3.AccessLog {
 
 	logFormat = &file_accesslogv3.FileAccessLog_LogFormat{
 		LogFormat: &corev3.SubstitutionFormatString{
-			Format: &corev3.SubstitutionFormatString_TextFormatSource{
-				TextFormatSource: &corev3.DataSource{
-					Specifier: &corev3.DataSource_InlineString{
-						InlineString: logConf.AccessLogs.Format,
+			Format: &corev3.SubstitutionFormatString_JsonFormat{
+				// TextFormatSource: &corev3.DataSource{
+				// 	Specifier: &corev3.DataSource_InlineString{
+				// 		InlineString: logConf.AccessLogs.Format,
+				// 	},
+				// },
+				JsonFormat: &_struct.Struct{
+					Fields: map[string]*structpb.Value{
+						"protocol": structpb.NewStringValue("%PROTOCOL%"),
+						"duration": structpb.NewStringValue("%DURATION%"),
+						"method":   structpb.NewStringValue("%REQ(:METHOD)%"),
 					},
 				},
 			},
